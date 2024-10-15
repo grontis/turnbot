@@ -6,16 +6,15 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
+
+	"turnbot/interactions"
+	"turnbot/utils"
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/joho/godotenv"
-	"golang.org/x/exp/rand"
 )
 
-var (
-	botToken string
-)
+var botToken string
 
 func init() {
 	err := godotenv.Load()
@@ -32,15 +31,74 @@ func main() {
 		return
 	}
 
-	dg.AddHandler(messageCreate)
+	cmdManager := interactions.NewCommandManager(dg)
+	btnManager := interactions.NewButtonManager()
+
+	cmdManager.RegisterCommand(&interactions.Command{
+		Name:        "hello",
+		Description: "Says hello!",
+		Handler: func(s *discordgo.Session, i *discordgo.InteractionCreate) {
+			s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+				Type: discordgo.InteractionResponseChannelMessageWithSource,
+				Data: &discordgo.InteractionResponseData{
+					Content: "Hello from your bot!",
+				},
+			})
+		},
+	})
+
+	cmdManager.RegisterCommand(&interactions.Command{
+		Name:        "createrole",
+		Description: "Creates a new role in the server",
+		Handler: func(s *discordgo.Session, i *discordgo.InteractionCreate) {
+			createRole(s, i.GuildID, "Foo", discordgo.PermissionManageMessages, 0xFF5733)
+			s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+				Type: discordgo.InteractionResponseChannelMessageWithSource,
+				Data: &discordgo.InteractionResponseData{
+					Content: "Role created successfully!", //TODO conditional data based on success/fail
+				},
+			})
+		},
+	})
+
+	btnManager.RegisterButtonInteraction(&interactions.ButtonInteraction{
+		CustomID: "button_dice_roll",
+		Label:    "Roll 1d6 🎲",
+		Style:    discordgo.PrimaryButton,
+		Handler: func(s *discordgo.Session, i *discordgo.InteractionCreate) {
+			diceRoll := utils.RollDice(6)
+			s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+				Type: discordgo.InteractionResponseChannelMessageWithSource,
+				Data: &discordgo.InteractionResponseData{
+					Content: fmt.Sprintf("🎲 You rolled a %d!", diceRoll),
+				},
+			})
+		},
+	})
+
+	//TODO GetButton by ID function
+	// channelID := "1295611869515612222"
+	// _, err = dg.ChannelMessageSendComplex(channelID, &discordgo.MessageSend{
+	// 	Content: "Click the button to roll a dice:",
+	// 	Components: []discordgo.MessageComponent{
+	// 		discordgo.ActionsRow{
+	// 			Components: btnManager.GetButtons(),
+	// 		},
+	// 	},
+	// })
+	// if err != nil {
+	// 	fmt.Println("Error sending message:", err)
+	// 	return
+	// }
+
 	dg.AddHandler(func(s *discordgo.Session, i *discordgo.InteractionCreate) {
 		switch i.Type {
 		case discordgo.InteractionApplicationCommand:
-			handleSlashCommand(s, i)
+			cmdManager.HandleCommand(s, i)
+		case discordgo.InteractionMessageComponent:
+			btnManager.HandleButtonInteraction(s, i)
 		}
 	})
-
-	dg.AddHandler(buttonClickHandler)
 
 	err = dg.Open()
 	if err != nil {
@@ -48,29 +106,13 @@ func main() {
 		return
 	}
 
-	registerSlashCommands(dg)
-
-	channelID := "1295243704457760819"
-	_, err = dg.ChannelMessageSendComplex(channelID, &discordgo.MessageSend{
-		Components: []discordgo.MessageComponent{
-			discordgo.ActionsRow{
-				Components: []discordgo.MessageComponent{
-					discordgo.Button{
-						Label:    "Roll 1d6 🎲",
-						Style:    discordgo.PrimaryButton,
-						CustomID: "button_dice_roll",
-					},
-				},
-			},
-		},
-	})
+	err = cmdManager.RegisterAllCommands()
 	if err != nil {
-		fmt.Println("Error sending message: ", err)
+		fmt.Println("Error registering commands:", err)
 		return
 	}
 
-	fmt.Println("Bot is now running. Press CTRL+C to exit.")
-
+	fmt.Println("Bot is running. Press CTRL+C to exit.")
 	sc := make(chan os.Signal, 1)
 	signal.Notify(sc, syscall.SIGINT, syscall.SIGTERM, os.Interrupt)
 	<-sc
@@ -78,52 +120,19 @@ func main() {
 	dg.Close()
 }
 
-func registerSlashCommands(s *discordgo.Session) error {
-	_, err := s.ApplicationCommandCreate(s.State.User.ID, "", &discordgo.ApplicationCommand{
-		Name:        "hello",
-		Description: "Says hello!",
-	})
+// TODO role manager?
+func createRole(s *discordgo.Session, guildID string, roleName string, permissions int64, color int) {
+	roleParams := &discordgo.RoleParams{
+		Name:        roleName,
+		Permissions: &permissions,
+		Color:       &color,
+	}
+
+	role, err := s.GuildRoleCreate(guildID, roleParams)
 	if err != nil {
-		fmt.Println("Cannot create slash command: ", err)
-		return err
-	}
-	return nil
-}
-
-func handleSlashCommand(s *discordgo.Session, i *discordgo.InteractionCreate) {
-	if i.ApplicationCommandData().Name == "hello" {
-		s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
-			Type: discordgo.InteractionResponseChannelMessageWithSource,
-			Data: &discordgo.InteractionResponseData{
-				Content: "Hello from your bot!",
-			},
-		})
-	}
-}
-
-func buttonClickHandler(s *discordgo.Session, i *discordgo.InteractionCreate) {
-	// Check if the button clicked was the dice roll button
-	if i.MessageComponentData().CustomID == "button_dice_roll" {
-		// Simulate rolling a 6-sided dice
-		seed := uint64(time.Now().UnixNano()) // Convert int64 to uint64 for rand.Seed
-		rand.Seed(seed)                       // Seed random number generator
-		diceRoll := rand.Intn(6) + 1          // Generate a number between 1 and 6
-
-		// Respond to the button click with the dice roll result
-		s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
-			Type: discordgo.InteractionResponseChannelMessageWithSource,
-			Data: &discordgo.InteractionResponseData{
-				Content: fmt.Sprintf("🎲 You rolled a %d!", diceRoll),
-			},
-		})
-	}
-}
-func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
-	if m.Author.ID == s.State.User.ID {
+		fmt.Printf("Error creating role: %v\n", err)
 		return
 	}
 
-	if m.Content == "hello" {
-		s.ChannelMessageSend(m.ChannelID, "Hello World!")
-	}
+	fmt.Printf("Role '%s' created successfully with ID: %s\n", role.Name, role.ID)
 }
