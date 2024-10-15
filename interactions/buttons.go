@@ -37,6 +37,8 @@ func (bm *ButtonManager) HandleButtonInteraction(s *discordgo.Session, i *discor
 	}
 }
 
+//TODO function to get button by map key
+
 func (bm *ButtonManager) GetButtons() []discordgo.MessageComponent {
 	var buttons []discordgo.MessageComponent
 	for _, button := range bm.ButtonHandlers {
