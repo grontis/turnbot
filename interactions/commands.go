@@ -1,5 +1,7 @@
 package interactions
 
+//TODO refactor into commands package?
+
 import (
 	"github.com/bwmarrin/discordgo"
 )

@@ -14,6 +14,8 @@ import (
 	"github.com/joho/godotenv"
 )
 
+//TODO logging library
+
 var botToken string
 
 func init() {
@@ -104,11 +106,23 @@ func main() {
 		}
 	})
 
+	dg.AddHandler(func(s *discordgo.Session, i *discordgo.InteractionCreate) {
+		switch i.Type {
+		case discordgo.InteractionMessageComponent:
+			handleButtonClick(s, i)
+		case discordgo.InteractionModalSubmit:
+			handleModalSubmit(s, i)
+		}
+	})
+
 	err = dg.Open()
 	if err != nil {
 		fmt.Println("Error opening connection: ", err)
 		return
 	}
+
+	channelID := "1295611869515612222"
+	sendButtonMessage(dg, channelID)
 
 	err = cmdManager.RegisterAllCommands()
 	if err != nil {
@@ -140,6 +154,87 @@ func createRole(s *discordgo.Session, guildID string, roleName string, permissio
 	}
 
 	fmt.Printf("Role '%s' created successfully with ID: %s\n", role.Name, role.ID)
+}
+
+// TODO create modal struct
+// define modal creation and submit functions
+// it can be used to tie into button actions?
+func sendButtonMessage(s *discordgo.Session, channelID string) {
+	_, err := s.ChannelMessageSendComplex(channelID, &discordgo.MessageSend{
+		Content: "Click the button to open the modal and provide your info:",
+		Components: []discordgo.MessageComponent{
+			discordgo.ActionsRow{
+				Components: []discordgo.MessageComponent{
+					discordgo.Button{
+						Label:    "Open Form",
+						Style:    discordgo.PrimaryButton,
+						CustomID: "open_modal_button",
+					},
+				},
+			},
+		},
+	})
+	if err != nil {
+		fmt.Println("Error sending message:", err)
+	}
+}
+
+func handleButtonClick(s *discordgo.Session, i *discordgo.InteractionCreate) {
+	if i.MessageComponentData().CustomID == "open_modal_button" {
+		modal := &discordgo.InteractionResponse{
+			Type: discordgo.InteractionResponseModal,
+			Data: &discordgo.InteractionResponseData{
+				Title:    "User Input Form",
+				CustomID: "user_input_modal",
+				Components: []discordgo.MessageComponent{
+					discordgo.ActionsRow{
+						Components: []discordgo.MessageComponent{
+							discordgo.TextInput{
+								CustomID:    "username_input",
+								Label:       "Enter your username",
+								Style:       discordgo.TextInputShort,
+								Placeholder: "Username",
+								Required:    true,
+							},
+						},
+					},
+					discordgo.ActionsRow{
+						Components: []discordgo.MessageComponent{
+							discordgo.TextInput{
+								CustomID:    "age_input",
+								Label:       "Enter your age",
+								Style:       discordgo.TextInputShort,
+								Placeholder: "Age",
+								Required:    true,
+							},
+						},
+					},
+				},
+			},
+		}
+
+		err := s.InteractionRespond(i.Interaction, modal)
+		if err != nil {
+			fmt.Println("Error sending modal:", err)
+		}
+	}
+}
+
+func handleModalSubmit(s *discordgo.Session, i *discordgo.InteractionCreate) {
+	if i.ModalSubmitData().CustomID == "user_input_modal" {
+		username := i.ModalSubmitData().Components[0].(*discordgo.ActionsRow).Components[0].(*discordgo.TextInput).Value
+		age := i.ModalSubmitData().Components[1].(*discordgo.ActionsRow).Components[0].(*discordgo.TextInput).Value
+
+		err := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+			Type: discordgo.InteractionResponseChannelMessageWithSource,
+			Data: &discordgo.InteractionResponseData{
+				Content: fmt.Sprintf("You entered: Username: %s, Age: %s", username, age),
+			},
+		})
+		if err != nil {
+			fmt.Println("Error responding to modal submission:", err)
+		}
+	}
 }
 
 //TODO design like game engine.
