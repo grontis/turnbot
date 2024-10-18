@@ -1,4 +1,4 @@
-package interactions
+package commands
 
 //TODO refactor into commands package?
 
@@ -29,7 +29,7 @@ func (cm *CommandManager) RegisterCommand(command *Command) {
 	cm.Commands = append(cm.Commands, command)
 }
 
-func (cm *CommandManager) RegisterAllCommands() error {
+func (cm *CommandManager) CreateAllCommands() error {
 	for _, cmd := range cm.Commands {
 		_, err := cm.Session.ApplicationCommandCreate(cm.Session.State.User.ID, "", &discordgo.ApplicationCommand{
 			Name:        cmd.Name,

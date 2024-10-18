@@ -7,6 +7,7 @@ import (
 	"os/signal"
 	"syscall"
 
+	"turnbot/commands"
 	"turnbot/interactions"
 	"turnbot/utils"
 
@@ -35,12 +36,54 @@ func main() {
 		return
 	}
 
+	channelId := "1296707235774205972"
+
 	//TODO utilize/learn state type
 
-	cmdManager := interactions.NewCommandManager(dg)
+	cmdManager := commands.NewCommandManager(dg)
 	btnManager := interactions.NewButtonManager()
+	modalManager := interactions.NewModalManager()
 
-	cmdManager.RegisterCommand(&interactions.Command{
+	// TODO how to better handle the dependency of buttons on another manager?
+	registerButtons(btnManager, modalManager)
+	registerCommands(cmdManager)
+	registerModals(modalManager)
+
+	dg.AddHandler(func(s *discordgo.Session, i *discordgo.InteractionCreate) {
+		switch i.Type {
+		case discordgo.InteractionApplicationCommand:
+			cmdManager.HandleCommand(s, i)
+		case discordgo.InteractionMessageComponent:
+			btnManager.HandleButtonInteraction(s, i)
+		case discordgo.InteractionModalSubmit:
+			modalManager.HandleModalSubmission(s, i)
+		}
+	})
+
+	err = dg.Open()
+	if err != nil {
+		fmt.Println("Error opening connection: ", err)
+		return
+	}
+
+	err = cmdManager.CreateAllCommands()
+	if err != nil {
+		fmt.Println("Error registering commands:", err)
+		return
+	}
+
+	btnManager.SendButtonMessage(dg, channelId, "open_modal_button", "open modal")
+
+	fmt.Println("Bot is running. Press CTRL+C to exit.")
+	sc := make(chan os.Signal, 1)
+	signal.Notify(sc, syscall.SIGINT, syscall.SIGTERM, os.Interrupt)
+	<-sc
+
+	dg.Close()
+}
+
+func registerCommands(cmdManager *commands.CommandManager) {
+	cmdManager.RegisterCommand(&commands.Command{
 		Name:        "hello",
 		Description: "Says hello!",
 		Handler: func(s *discordgo.Session, i *discordgo.InteractionCreate) {
@@ -52,21 +95,10 @@ func main() {
 			})
 		},
 	})
+}
 
-	cmdManager.RegisterCommand(&interactions.Command{
-		Name:        "createrole",
-		Description: "Creates a new role in the server",
-		Handler: func(s *discordgo.Session, i *discordgo.InteractionCreate) {
-			createRole(s, i.GuildID, "Foo", discordgo.PermissionManageMessages, 0xFF5733)
-			s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
-				Type: discordgo.InteractionResponseChannelMessageWithSource,
-				Data: &discordgo.InteractionResponseData{
-					Content: "Role created successfully!", //TODO conditional data based on success/fail
-				},
-			})
-		},
-	})
-
+// TODO how to better handle the dependency of buttons on another manager?
+func registerButtons(btnManager *interactions.ButtonManager, modalManager *interactions.ModalManager) {
 	btnManager.RegisterButtonInteraction(&interactions.ButtonInteraction{
 		CustomID: "button_dice_roll",
 		Label:    "Roll 1d6 🎲",
@@ -82,159 +114,68 @@ func main() {
 		},
 	})
 
-	//TODO GetButton by ID function
-	// channelID := "1295611869515612222"
-	// _, err = dg.ChannelMessageSendComplex(channelID, &discordgo.MessageSend{
-	// 	Content: "Click the button to roll a dice:",
-	// 	Components: []discordgo.MessageComponent{
-	// 		discordgo.ActionsRow{
-	// 			Components: btnManager.GetButtons(),
-	// 		},
-	// 	},
-	// })
-	// if err != nil {
-	// 	fmt.Println("Error sending message:", err)
-	// 	return
-	// }
-
-	dg.AddHandler(func(s *discordgo.Session, i *discordgo.InteractionCreate) {
-		switch i.Type {
-		case discordgo.InteractionApplicationCommand:
-			cmdManager.HandleCommand(s, i)
-		case discordgo.InteractionMessageComponent:
-			btnManager.HandleButtonInteraction(s, i)
-		}
+	btnManager.RegisterButtonInteraction(&interactions.ButtonInteraction{
+		CustomID: "open_modal_button", // CustomID matches the handler
+		Label:    "Open Modal",
+		Style:    discordgo.PrimaryButton,
+		Handler: func(s *discordgo.Session, i *discordgo.InteractionCreate) {
+			// This handler will trigger when the button is clicked
+			modal := modalManager.GetModalByCustomID("user_info_modal")
+			s.InteractionRespond(i.Interaction, modal.ToModal()) // Open the modal
+		},
 	})
 
-	dg.AddHandler(func(s *discordgo.Session, i *discordgo.InteractionCreate) {
-		switch i.Type {
-		case discordgo.InteractionMessageComponent:
-			handleButtonClick(s, i)
-		case discordgo.InteractionModalSubmit:
-			handleModalSubmit(s, i)
-		}
+	btnManager.RegisterButtonInteraction(&interactions.ButtonInteraction{
+		CustomID: "create_character",
+		Label:    "Create character",
+		Style:    discordgo.PrimaryButton,
+		Handler: func(s *discordgo.Session, i *discordgo.InteractionCreate) {
+
+		},
 	})
-
-	err = dg.Open()
-	if err != nil {
-		fmt.Println("Error opening connection: ", err)
-		return
-	}
-
-	channelID := "1295611869515612222"
-	sendButtonMessage(dg, channelID)
-
-	err = cmdManager.RegisterAllCommands()
-	if err != nil {
-		fmt.Println("Error registering commands:", err)
-		return
-	}
-
-	fmt.Println("Bot is running. Press CTRL+C to exit.")
-	sc := make(chan os.Signal, 1)
-	signal.Notify(sc, syscall.SIGINT, syscall.SIGTERM, os.Interrupt)
-	<-sc
-
-	dg.Close()
 }
 
-// TODO role manager?
-// TODO need to propagate error out of this so that we can indicated error in discord
-func createRole(s *discordgo.Session, guildID string, roleName string, permissions int64, color int) {
-	roleParams := &discordgo.RoleParams{
-		Name:        roleName,
-		Permissions: &permissions,
-		Color:       &color,
-	}
-
-	role, err := s.GuildRoleCreate(guildID, roleParams)
-	if err != nil {
-		fmt.Printf("Error creating role: %v\n", err)
-		return
-	}
-
-	fmt.Printf("Role '%s' created successfully with ID: %s\n", role.Name, role.ID)
-}
-
-// TODO create modal struct
-// define modal creation and submit functions
-// it can be used to tie into button actions?
-func sendButtonMessage(s *discordgo.Session, channelID string) {
-	_, err := s.ChannelMessageSendComplex(channelID, &discordgo.MessageSend{
-		Content: "Click the button to open the modal and provide your info:",
+func registerModals(modalManager *interactions.ModalManager) {
+	//TODO maybe someway to make this cleaner?
+	modalManager.RegisterModal(&interactions.ModalInteraction{
+		CustomID: "user_info_modal",
+		Title:    "Enter Your Info",
 		Components: []discordgo.MessageComponent{
 			discordgo.ActionsRow{
 				Components: []discordgo.MessageComponent{
-					discordgo.Button{
-						Label:    "Open Form",
-						Style:    discordgo.PrimaryButton,
-						CustomID: "open_modal_button",
+					discordgo.TextInput{
+						CustomID:    "username_input",
+						Label:       "Enter your username",
+						Style:       discordgo.TextInputShort,
+						Placeholder: "Username",
+						Required:    true,
+					},
+				},
+			},
+			discordgo.ActionsRow{
+				Components: []discordgo.MessageComponent{
+					discordgo.TextInput{
+						CustomID:    "age_input",
+						Label:       "Enter your age",
+						Style:       discordgo.TextInputShort,
+						Placeholder: "Age",
+						Required:    true,
 					},
 				},
 			},
 		},
-	})
-	if err != nil {
-		fmt.Println("Error sending message:", err)
-	}
-}
+		Handler: func(s *discordgo.Session, i *discordgo.InteractionCreate) {
+			username := i.ModalSubmitData().Components[0].(*discordgo.ActionsRow).Components[0].(*discordgo.TextInput).Value
+			age := i.ModalSubmitData().Components[1].(*discordgo.ActionsRow).Components[0].(*discordgo.TextInput).Value
 
-func handleButtonClick(s *discordgo.Session, i *discordgo.InteractionCreate) {
-	if i.MessageComponentData().CustomID == "open_modal_button" {
-		modal := &discordgo.InteractionResponse{
-			Type: discordgo.InteractionResponseModal,
-			Data: &discordgo.InteractionResponseData{
-				Title:    "User Input Form",
-				CustomID: "user_input_modal",
-				Components: []discordgo.MessageComponent{
-					discordgo.ActionsRow{
-						Components: []discordgo.MessageComponent{
-							discordgo.TextInput{
-								CustomID:    "username_input",
-								Label:       "Enter your username",
-								Style:       discordgo.TextInputShort,
-								Placeholder: "Username",
-								Required:    true,
-							},
-						},
-					},
-					discordgo.ActionsRow{
-						Components: []discordgo.MessageComponent{
-							discordgo.TextInput{
-								CustomID:    "age_input",
-								Label:       "Enter your age",
-								Style:       discordgo.TextInputShort,
-								Placeholder: "Age",
-								Required:    true,
-							},
-						},
-					},
+			s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+				Type: discordgo.InteractionResponseChannelMessageWithSource,
+				Data: &discordgo.InteractionResponseData{
+					Content: fmt.Sprintf("You entered: Username: %s, Age: %s", username, age),
 				},
-			},
-		}
-
-		err := s.InteractionRespond(i.Interaction, modal)
-		if err != nil {
-			fmt.Println("Error sending modal:", err)
-		}
-	}
-}
-
-func handleModalSubmit(s *discordgo.Session, i *discordgo.InteractionCreate) {
-	if i.ModalSubmitData().CustomID == "user_input_modal" {
-		username := i.ModalSubmitData().Components[0].(*discordgo.ActionsRow).Components[0].(*discordgo.TextInput).Value
-		age := i.ModalSubmitData().Components[1].(*discordgo.ActionsRow).Components[0].(*discordgo.TextInput).Value
-
-		err := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
-			Type: discordgo.InteractionResponseChannelMessageWithSource,
-			Data: &discordgo.InteractionResponseData{
-				Content: fmt.Sprintf("You entered: Username: %s, Age: %s", username, age),
-			},
-		})
-		if err != nil {
-			fmt.Println("Error responding to modal submission:", err)
-		}
-	}
+			})
+		},
+	})
 }
 
 //TODO design like game engine.

@@ -1,6 +1,10 @@
 package interactions
 
-import "github.com/bwmarrin/discordgo"
+import (
+	"fmt"
+
+	"github.com/bwmarrin/discordgo"
+)
 
 type ButtonInteraction struct {
 	CustomID string
@@ -37,7 +41,31 @@ func (bm *ButtonManager) HandleButtonInteraction(s *discordgo.Session, i *discor
 	}
 }
 
-//TODO function to get button by map key
+func (bm *ButtonManager) SendButtonMessage(s *discordgo.Session, channelID, customID, content string) error {
+	button := bm.GetButtonByCustomID(customID)
+	if button == nil {
+		return fmt.Errorf("button with custom ID '%s' not found", customID)
+	}
+
+	_, err := s.ChannelMessageSendComplex(channelID, &discordgo.MessageSend{
+		Content: content,
+		Components: []discordgo.MessageComponent{
+			discordgo.ActionsRow{
+				Components: []discordgo.MessageComponent{
+					button.ToButton(),
+				},
+			},
+		},
+	})
+	return err
+}
+
+func (bm *ButtonManager) GetButtonByCustomID(customID string) *ButtonInteraction {
+	if button, ok := bm.ButtonHandlers[customID]; ok {
+		return button
+	}
+	return nil
+}
 
 func (bm *ButtonManager) GetButtons() []discordgo.MessageComponent {
 	var buttons []discordgo.MessageComponent
