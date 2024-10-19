@@ -41,7 +41,7 @@ func (bm *ButtonManager) HandleButtonInteraction(s *discordgo.Session, i *discor
 	}
 }
 
-func (bm *ButtonManager) SendButtonMessage(s *discordgo.Session, channelID, customID, content string) error {
+func (bm *ButtonManager) SendButtonMessage(s *discordgo.Session, channelID, customID string, content string) error {
 	button := bm.GetButtonByCustomID(customID)
 	if button == nil {
 		return fmt.Errorf("button with custom ID '%s' not found", customID)
