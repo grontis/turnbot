@@ -128,7 +128,7 @@ func main() {
 		return
 	}
 
-	err = dropdownManager.SendDropdownMessage(dg, channelID, "class_select_dropdown")
+	err = dropdownManager.SendDropdownMessage(dg, channelID, "class_select_dropdown", "Choose your character's class")
 	if err != nil {
 		fmt.Println("Error sending message:", err)
 		return

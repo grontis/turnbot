@@ -41,14 +41,14 @@ func (dm *DropdownManager) HandleDropdownInteraction(s *discordgo.Session, i *di
 	}
 }
 
-func (dm *DropdownManager) SendDropdownMessage(s *discordgo.Session, channelID, customID string) error {
+func (dm *DropdownManager) SendDropdownMessage(s *discordgo.Session, channelID, customID string, content string) error {
 	dropdown := dm.GetDropdownByCustomID(customID)
 	if dropdown == nil {
 		return fmt.Errorf("dropdown with custom ID '%s' not found", customID)
 	}
 
 	_, err := s.ChannelMessageSendComplex(channelID, &discordgo.MessageSend{
-		Content: dropdown.Placeholder,
+		Content: content,
 		Components: []discordgo.MessageComponent{
 			discordgo.ActionsRow{
 				Components: []discordgo.MessageComponent{
