@@ -2,12 +2,13 @@ package interactions
 
 import (
 	"fmt"
+	"turnbot/identifiers"
 
 	"github.com/bwmarrin/discordgo"
 )
 
 type ButtonInteraction struct {
-	CustomID string
+	CustomID identifiers.CustomID
 	Label    string
 	Style    discordgo.ButtonStyle
 	Handler  func(s *discordgo.Session, i *discordgo.InteractionCreate)
@@ -17,17 +18,17 @@ func (bi *ButtonInteraction) ToButton() discordgo.Button {
 	return discordgo.Button{
 		Label:    bi.Label,
 		Style:    bi.Style,
-		CustomID: bi.CustomID,
+		CustomID: string(bi.CustomID),
 	}
 }
 
 type ButtonManager struct {
-	ButtonHandlers map[string]*ButtonInteraction
+	ButtonHandlers map[identifiers.CustomID]*ButtonInteraction
 }
 
 func NewButtonManager() *ButtonManager {
 	return &ButtonManager{
-		ButtonHandlers: make(map[string]*ButtonInteraction),
+		ButtonHandlers: make(map[identifiers.CustomID]*ButtonInteraction),
 	}
 }
 
@@ -36,12 +37,12 @@ func (bm *ButtonManager) RegisterButtonInteraction(button *ButtonInteraction) {
 }
 
 func (bm *ButtonManager) HandleButtonInteraction(s *discordgo.Session, i *discordgo.InteractionCreate) {
-	if handler, ok := bm.ButtonHandlers[i.MessageComponentData().CustomID]; ok {
+	if handler, ok := bm.ButtonHandlers[identifiers.CustomID(i.MessageComponentData().CustomID)]; ok {
 		handler.Handler(s, i)
 	}
 }
 
-func (bm *ButtonManager) SendButtonMessage(s *discordgo.Session, channelID, customID string, content string) error {
+func (bm *ButtonManager) SendButtonMessage(s *discordgo.Session, channelID string, customID identifiers.CustomID, content string) error {
 	button := bm.GetButtonByCustomID(customID)
 	if button == nil {
 		return fmt.Errorf("button with custom ID '%s' not found", customID)
@@ -60,7 +61,7 @@ func (bm *ButtonManager) SendButtonMessage(s *discordgo.Session, channelID, cust
 	return err
 }
 
-func (bm *ButtonManager) GetButtonByCustomID(customID string) *ButtonInteraction {
+func (bm *ButtonManager) GetButtonByCustomID(customID identifiers.CustomID) *ButtonInteraction {
 	if button, ok := bm.ButtonHandlers[customID]; ok {
 		return button
 	}

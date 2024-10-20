@@ -2,12 +2,13 @@ package interactions
 
 import (
 	"fmt"
+	"turnbot/identifiers"
 
 	"github.com/bwmarrin/discordgo"
 )
 
 type DropdownInteraction struct {
-	CustomID    string
+	CustomID    identifiers.CustomID
 	Placeholder string
 	Options     []discordgo.SelectMenuOption
 	Handler     func(s *discordgo.Session, i *discordgo.InteractionCreate)
@@ -15,33 +16,33 @@ type DropdownInteraction struct {
 
 func (di *DropdownInteraction) ToDropdown() discordgo.SelectMenu {
 	return discordgo.SelectMenu{
-		CustomID:    di.CustomID,
+		CustomID:    string(di.CustomID),
 		Placeholder: di.Placeholder,
 		Options:     di.Options,
 	}
 }
 
 type DropdownManager struct {
-	DropdownHandlers map[string]*DropdownInteraction
+	DropdownHandlers map[identifiers.CustomID]*DropdownInteraction
 }
 
 func NewDropdownManager() *DropdownManager {
 	return &DropdownManager{
-		DropdownHandlers: make(map[string]*DropdownInteraction),
+		DropdownHandlers: make(map[identifiers.CustomID]*DropdownInteraction),
 	}
 }
 
 func (dm *DropdownManager) RegisterDropdownInteraction(dropdown *DropdownInteraction) {
-	dm.DropdownHandlers[dropdown.CustomID] = dropdown
+	dm.DropdownHandlers[(dropdown.CustomID)] = dropdown
 }
 
 func (dm *DropdownManager) HandleDropdownInteraction(s *discordgo.Session, i *discordgo.InteractionCreate) {
-	if handler, ok := dm.DropdownHandlers[i.MessageComponentData().CustomID]; ok {
+	if handler, ok := dm.DropdownHandlers[identifiers.CustomID(i.MessageComponentData().CustomID)]; ok {
 		handler.Handler(s, i)
 	}
 }
 
-func (dm *DropdownManager) SendDropdownMessage(s *discordgo.Session, channelID, customID string, content string) error {
+func (dm *DropdownManager) SendDropdownMessage(s *discordgo.Session, channelID string, customID identifiers.CustomID, content string) error {
 	dropdown := dm.GetDropdownByCustomID(customID)
 	if dropdown == nil {
 		return fmt.Errorf("dropdown with custom ID '%s' not found", customID)
@@ -60,7 +61,8 @@ func (dm *DropdownManager) SendDropdownMessage(s *discordgo.Session, channelID, 
 	return err
 }
 
-func (dm *DropdownManager) GetDropdownByCustomID(customID string) *DropdownInteraction {
+// TODO by googles naming conventions this should be Dropdown()
+func (dm *DropdownManager) GetDropdownByCustomID(customID identifiers.CustomID) *DropdownInteraction {
 	if dropdown, ok := dm.DropdownHandlers[customID]; ok {
 		return dropdown
 	}

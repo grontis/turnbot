@@ -8,6 +8,7 @@ import (
 	"syscall"
 
 	"turnbot/commands"
+	"turnbot/identifiers"
 	"turnbot/interactions"
 	"turnbot/utils"
 
@@ -80,59 +81,23 @@ func main() {
 		return
 	}
 
-	// Send a message with a select menu (dropdown)
-	_, err = dg.ChannelMessageSendComplex(channelID, &discordgo.MessageSend{
-		Content: "Select your favorite color:",
-		Components: []discordgo.MessageComponent{
-			discordgo.ActionsRow{
-				Components: []discordgo.MessageComponent{
-					discordgo.SelectMenu{
-						CustomID:    "color_selection",
-						Placeholder: "Choose a color",
-						Options: []discordgo.SelectMenuOption{
-							{
-								Label:       "Red",
-								Value:       "red",
-								Description: "The color of passion and energy",
-							},
-							{
-								Label:       "Green",
-								Value:       "green",
-								Description: "The color of nature and harmony",
-							},
-							{
-								Label:       "Blue",
-								Value:       "blue",
-								Description: "The color of calm and serenity",
-							},
-						},
-					},
-				},
-			},
-		},
-	})
-	if err != nil {
-		fmt.Println("Error sending message:", err)
-		return
-	}
-
 	err = cmdManager.CreateAllCommands()
 	if err != nil {
 		fmt.Println("Error registering commands:", err)
 		return
 	}
 
-	err = btnManager.SendButtonMessage(dg, channelID, "open_modal_button", "open modal")
+	err = btnManager.SendButtonMessage(dg, channelID, identifiers.ButtonOpenCharacterInfoModalCustomID, "open modal")
 	if err != nil {
 		fmt.Println("Error sending message:", err)
 		return
 	}
 
-	err = dropdownManager.SendDropdownMessage(dg, channelID, "class_select_dropdown", "Choose your character's class")
-	if err != nil {
-		fmt.Println("Error sending message:", err)
-		return
-	}
+	// err = dropdownManager.SendDropdownMessage(dg, channelID, constants.DropdownClassSelect, "Choose your character's class")
+	// if err != nil {
+	// 	fmt.Println("Error sending message:", err)
+	// 	return
+	// }
 
 	fmt.Println("Bot is running. Press CTRL+C to exit.")
 	sc := make(chan os.Signal, 1)
@@ -160,7 +125,7 @@ func registerCommands(cmdManager *commands.CommandManager) {
 // TODO how to better handle the dependency of buttons on another manager?
 func registerButtons(btnManager *interactions.ButtonManager, modalManager *interactions.ModalManager) {
 	btnManager.RegisterButtonInteraction(&interactions.ButtonInteraction{
-		CustomID: "button_dice_roll",
+		CustomID: identifiers.ButtonDiceRollCustomID,
 		Label:    "Roll 1d6 🎲",
 		Style:    discordgo.PrimaryButton,
 		Handler: func(s *discordgo.Session, i *discordgo.InteractionCreate) {
@@ -175,34 +140,25 @@ func registerButtons(btnManager *interactions.ButtonManager, modalManager *inter
 	})
 
 	btnManager.RegisterButtonInteraction(&interactions.ButtonInteraction{
-		CustomID: "open_modal_button",
+		CustomID: identifiers.ButtonOpenCharacterInfoModalCustomID,
 		Label:    "Open Modal",
 		Style:    discordgo.PrimaryButton,
 		Handler: func(s *discordgo.Session, i *discordgo.InteractionCreate) {
-			modal := modalManager.GetModalByCustomID("user_info_modal")
+			modal := modalManager.GetModalByCustomID(identifiers.ModalCharacterInfoCustomID)
 			s.InteractionRespond(i.Interaction, modal.ToModal())
-		},
-	})
-
-	btnManager.RegisterButtonInteraction(&interactions.ButtonInteraction{
-		CustomID: "create_character",
-		Label:    "Create character",
-		Style:    discordgo.PrimaryButton,
-		Handler: func(s *discordgo.Session, i *discordgo.InteractionCreate) {
-
 		},
 	})
 }
 
 func registerModals(modalManager *interactions.ModalManager) {
 	modalManager.RegisterModal(&interactions.ModalInteraction{
-		CustomID: "user_info_modal",
+		CustomID: identifiers.ModalCharacterInfoCustomID,
 		Title:    "Enter Your Info",
 		Components: []discordgo.MessageComponent{
 			discordgo.ActionsRow{
 				Components: []discordgo.MessageComponent{
 					discordgo.TextInput{
-						CustomID:    "character_name_input",
+						CustomID:    identifiers.TextInputCharacterName,
 						Label:       "Enter your character's name",
 						Style:       discordgo.TextInputShort,
 						Placeholder: "Character name",
@@ -213,7 +169,7 @@ func registerModals(modalManager *interactions.ModalManager) {
 			discordgo.ActionsRow{
 				Components: []discordgo.MessageComponent{
 					discordgo.TextInput{
-						CustomID:    "age_input",
+						CustomID:    identifiers.TextInputCharacterAge,
 						Label:       "Enter your character's age",
 						Style:       discordgo.TextInputShort,
 						Placeholder: "Age",
@@ -237,7 +193,7 @@ func registerModals(modalManager *interactions.ModalManager) {
 
 func registerDropdowns(dropdownManager *interactions.DropdownManager) {
 	dropdownManager.RegisterDropdownInteraction(&interactions.DropdownInteraction{
-		CustomID:    "class_select_dropdown",
+		CustomID:    identifiers.DropdownClassSelectCustomID,
 		Placeholder: "Select your character's class",
 		Options: []discordgo.SelectMenuOption{
 			{
