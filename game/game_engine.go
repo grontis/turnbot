@@ -6,7 +6,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
-	"turnbot/identifiers"
+	"turnbot/guild"
 	"turnbot/interactions"
 
 	"github.com/bwmarrin/discordgo"
@@ -14,6 +14,7 @@ import (
 )
 
 var channelID string
+var guildID string
 
 type GameEngine struct {
 	Session            *discordgo.Session
@@ -34,6 +35,7 @@ func NewGameEngine(s *discordgo.Session) *GameEngine {
 		log.Fatalf("Error loading .env file")
 	}
 	channelID = os.Getenv("CHANNEL_ID")
+	guildID = os.Getenv("GUILD_ID")
 
 	engine.init()
 
@@ -63,17 +65,27 @@ func (ge *GameEngine) Run() {
 	//TODO better design for this?
 	ge.InteractionManager.CreateAllCommands()
 
-	err = ge.InteractionManager.SendButtonMessage(channelID, identifiers.ButtonDiceRollCustomID, "Roll some dice!")
+	categoryID := "1297794437036118026"
+	channelName := "foo-text"
+
+	channelManager, err := guild.NewChannelManager(ge.Session, guildID)
 	if err != nil {
-		fmt.Println("Error sending message: ", err)
+		log.Printf("error creating channel manager: %s", err)
 	}
+
+	channel, err := channelManager.CreateChannelUnderCategory(channelName, categoryID)
+	if err != nil {
+		fmt.Println("Error creating channel:", err)
+		return
+	}
+
+	fmt.Printf("channel: %s (ID: %s)\n", channel.Name, channel.ID)
 
 	awaitTerminateSignal()
 	ge.Session.Close()
 }
 
 func awaitTerminateSignal() {
-
 	fmt.Println("Bot is running. Press CTRL+C to exit.")
 	sc := make(chan os.Signal, 1)
 	signal.Notify(sc, syscall.SIGINT, syscall.SIGTERM, os.Interrupt)
