@@ -1,25 +1,33 @@
 package identifiers
 
-type CustomID string
+type ButtonCustomID string
 
-// Button CustomID constants
 const (
-	ButtonDiceRollCustomID               CustomID = "button_dice_roll"
-	ButtonOpenCharacterInfoModalCustomID CustomID = "button_open_character_info_modal"
+	ButtonDiceRollCustomID               ButtonCustomID = "button_dice_roll"
+	ButtonOpenCharacterInfoModalCustomID ButtonCustomID = "button_open_character_info_modal"
 )
 
-// Dropdown CustomID constants
+type CommandNameID string
+
 const (
-	DropdownClassSelectCustomID CustomID = "dropdown_class_select"
+	CommandHello CommandNameID = "command_hello"
 )
 
-// Modal CustomID constants
+type DropdownCustomID string
+
 const (
-	ModalCharacterInfoCustomID CustomID = "model_character_info"
+	DropdownClassSelectCustomID DropdownCustomID = "dropdown_class_select"
 )
 
-// TextInput CustomID constants
+type ModalCustomID string
+
 const (
-	TextInputCharacterName = "textinput_character_name"
-	TextInputCharacterAge  = "textinput_character_age"
+	ModalCharacterInfoCustomID ModalCustomID = "model_character_info"
+)
+
+type TextInputCustomID string
+
+const (
+	TextInputCharacterName TextInputCustomID = "textinput_character_name"
+	TextInputCharacterAge  TextInputCustomID = "textinput_character_age"
 )

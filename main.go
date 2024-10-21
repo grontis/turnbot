@@ -1,16 +1,10 @@
 package main
 
 import (
-	"fmt"
 	"log"
 	"os"
-	"os/signal"
-	"syscall"
 
-	"turnbot/commands"
-	"turnbot/identifiers"
-	"turnbot/interactions"
-	"turnbot/utils"
+	"turnbot/game"
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/joho/godotenv"
@@ -19,211 +13,34 @@ import (
 //TODO logging library
 
 var botToken string
+var guildID string
+var channelID string
 
-func init() {
+func initSession() (*discordgo.Session, error) {
 	err := godotenv.Load()
 	if err != nil {
 		log.Fatalf("Error loading .env file")
+		return nil, err
 	}
 
 	//TODO put token in AWS credentials parameter store
 	botToken = os.Getenv("DISCORD_TOKEN")
+
+	s, err := discordgo.New("Bot " + botToken)
+	return s, err
 }
 
 func main() {
-	dg, err := discordgo.New("Bot " + botToken)
+	s, err := initSession()
 	if err != nil {
-		fmt.Println("Error creating Discord session: ", err)
+		log.Printf("error initializing session: %s", err)
 		return
 	}
-
-	channelID := "1296707235774205972"
 
 	//TODO utilize/learn state type
 
-	cmdManager := commands.NewCommandManager(dg)
-	btnManager := interactions.NewButtonManager()
-	modalManager := interactions.NewModalManager()
-	dropdownManager := interactions.NewDropdownManager()
-
-	registerButtons(btnManager, modalManager)
-	registerCommands(cmdManager)
-	registerModals(modalManager)
-	registerDropdowns(dropdownManager)
-
-	dg.AddHandler(func(s *discordgo.Session, i *discordgo.InteractionCreate) {
-		switch i.Type {
-		case discordgo.InteractionApplicationCommand:
-			cmdManager.HandleCommand(s, i)
-
-		case discordgo.InteractionMessageComponent:
-			component := i.MessageComponentData().ComponentType
-			switch component {
-			case discordgo.ButtonComponent:
-				btnManager.HandleButtonInteraction(s, i)
-			case discordgo.SelectMenuComponent:
-				dropdownManager.HandleDropdownInteraction(s, i)
-			default:
-				fmt.Println("Unknown component type")
-			}
-
-		case discordgo.InteractionModalSubmit:
-			modalManager.HandleModalSubmission(s, i)
-
-		default:
-			fmt.Println("Unknown interaction type")
-		}
-	})
-
-	err = dg.Open()
-	if err != nil {
-		fmt.Println("Error opening connection: ", err)
-		return
-	}
-
-	err = cmdManager.CreateAllCommands()
-	if err != nil {
-		fmt.Println("Error registering commands:", err)
-		return
-	}
-
-	err = btnManager.SendButtonMessage(dg, channelID, identifiers.ButtonOpenCharacterInfoModalCustomID, "open modal")
-	if err != nil {
-		fmt.Println("Error sending message:", err)
-		return
-	}
-
-	// err = dropdownManager.SendDropdownMessage(dg, channelID, constants.DropdownClassSelect, "Choose your character's class")
-	// if err != nil {
-	// 	fmt.Println("Error sending message:", err)
-	// 	return
-	// }
-
-	fmt.Println("Bot is running. Press CTRL+C to exit.")
-	sc := make(chan os.Signal, 1)
-	signal.Notify(sc, syscall.SIGINT, syscall.SIGTERM, os.Interrupt)
-	<-sc
-
-	dg.Close()
-}
-
-func registerCommands(cmdManager *commands.CommandManager) {
-	cmdManager.RegisterCommand(&commands.Command{
-		Name:        "hello",
-		Description: "Says hello!",
-		Handler: func(s *discordgo.Session, i *discordgo.InteractionCreate) {
-			s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
-				Type: discordgo.InteractionResponseChannelMessageWithSource,
-				Data: &discordgo.InteractionResponseData{
-					Content: "Hello from your bot!",
-				},
-			})
-		},
-	})
-}
-
-// TODO how to better handle the dependency of buttons on another manager?
-func registerButtons(btnManager *interactions.ButtonManager, modalManager *interactions.ModalManager) {
-	btnManager.RegisterButtonInteraction(&interactions.ButtonInteraction{
-		CustomID: identifiers.ButtonDiceRollCustomID,
-		Label:    "Roll 1d6 🎲",
-		Style:    discordgo.PrimaryButton,
-		Handler: func(s *discordgo.Session, i *discordgo.InteractionCreate) {
-			diceRoll := utils.RollDice(6)
-			s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
-				Type: discordgo.InteractionResponseChannelMessageWithSource,
-				Data: &discordgo.InteractionResponseData{
-					Content: fmt.Sprintf("🎲 You rolled a %d!", diceRoll),
-				},
-			})
-		},
-	})
-
-	btnManager.RegisterButtonInteraction(&interactions.ButtonInteraction{
-		CustomID: identifiers.ButtonOpenCharacterInfoModalCustomID,
-		Label:    "Open Modal",
-		Style:    discordgo.PrimaryButton,
-		Handler: func(s *discordgo.Session, i *discordgo.InteractionCreate) {
-			modal := modalManager.GetModalByCustomID(identifiers.ModalCharacterInfoCustomID)
-			s.InteractionRespond(i.Interaction, modal.ToModal())
-		},
-	})
-}
-
-func registerModals(modalManager *interactions.ModalManager) {
-	modalManager.RegisterModal(&interactions.ModalInteraction{
-		CustomID: identifiers.ModalCharacterInfoCustomID,
-		Title:    "Enter Your Info",
-		Components: []discordgo.MessageComponent{
-			discordgo.ActionsRow{
-				Components: []discordgo.MessageComponent{
-					discordgo.TextInput{
-						CustomID:    identifiers.TextInputCharacterName,
-						Label:       "Enter your character's name",
-						Style:       discordgo.TextInputShort,
-						Placeholder: "Character name",
-						Required:    true,
-					},
-				},
-			},
-			discordgo.ActionsRow{
-				Components: []discordgo.MessageComponent{
-					discordgo.TextInput{
-						CustomID:    identifiers.TextInputCharacterAge,
-						Label:       "Enter your character's age",
-						Style:       discordgo.TextInputShort,
-						Placeholder: "Age",
-						Required:    true,
-					},
-				},
-			},
-		},
-		Handler: func(s *discordgo.Session, i *discordgo.InteractionCreate) {
-			username := i.ModalSubmitData().Components[0].(*discordgo.ActionsRow).Components[0].(*discordgo.TextInput).Value
-			age := i.ModalSubmitData().Components[1].(*discordgo.ActionsRow).Components[0].(*discordgo.TextInput).Value
-			s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
-				Type: discordgo.InteractionResponseChannelMessageWithSource,
-				Data: &discordgo.InteractionResponseData{
-					Content: fmt.Sprintf("You entered: Username: %s, Age: %s", username, age),
-				},
-			})
-		},
-	})
-}
-
-func registerDropdowns(dropdownManager *interactions.DropdownManager) {
-	dropdownManager.RegisterDropdownInteraction(&interactions.DropdownInteraction{
-		CustomID:    identifiers.DropdownClassSelectCustomID,
-		Placeholder: "Select your character's class",
-		Options: []discordgo.SelectMenuOption{
-			{
-				Label:       "Fighter",
-				Value:       "fighter",
-				Description: "Sword, shield, strength, and honor",
-			},
-			{
-				Label:       "Wizard",
-				Value:       "wizard",
-				Description: "A never ending thirst for knowledge of the arcana",
-			},
-			{
-				Label:       "Rogue",
-				Value:       "rogue",
-				Description: "Shadows and daggers",
-			},
-		},
-		Handler: func(s *discordgo.Session, i *discordgo.InteractionCreate) {
-			// Get the selected value from the select menu
-			selectedColor := i.MessageComponentData().Values[0]
-
-			s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
-				Type: discordgo.InteractionResponseChannelMessageWithSource,
-				Data: &discordgo.InteractionResponseData{
-					Content: fmt.Sprintf("You selected: %s", selectedColor),
-				},
-			})
-		},
-	})
+	engine := game.NewGameEngine(s)
+	engine.Run()
 }
 
 //TODO design like game engine.

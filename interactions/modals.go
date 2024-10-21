@@ -7,13 +7,13 @@ import (
 )
 
 type ModalInteraction struct {
-	CustomID   identifiers.CustomID
+	CustomID   identifiers.ModalCustomID
 	Title      string
 	Components []discordgo.MessageComponent
 	Handler    func(s *discordgo.Session, i *discordgo.InteractionCreate)
 }
 
-func (mi *ModalInteraction) ToModal() *discordgo.InteractionResponse {
+func (mi *ModalInteraction) toModal() *discordgo.InteractionResponse {
 	return &discordgo.InteractionResponse{
 		Type: discordgo.InteractionResponseModal,
 		Data: &discordgo.InteractionResponseData{
@@ -24,26 +24,26 @@ func (mi *ModalInteraction) ToModal() *discordgo.InteractionResponse {
 	}
 }
 
-type ModalManager struct {
-	ModalHandlers map[identifiers.CustomID]*ModalInteraction
+type modalManager struct {
+	ModalHandlers map[identifiers.ModalCustomID]*ModalInteraction
 }
 
-func NewModalManager() *ModalManager {
-	return &ModalManager{
-		ModalHandlers: make(map[identifiers.CustomID]*ModalInteraction),
+func newModalManager() *modalManager {
+	return &modalManager{
+		ModalHandlers: make(map[identifiers.ModalCustomID]*ModalInteraction),
 	}
 }
 
-func (mm *ModalManager) RegisterModal(modal *ModalInteraction) {
+func (mm *modalManager) registerModalInteraction(modal *ModalInteraction) {
 	mm.ModalHandlers[modal.CustomID] = modal
 }
 
-func (mm *ModalManager) HandleModalSubmission(s *discordgo.Session, i *discordgo.InteractionCreate) {
-	if handler, ok := mm.ModalHandlers[identifiers.CustomID(i.ModalSubmitData().CustomID)]; ok {
+func (mm *modalManager) handleModalInteraction(s *discordgo.Session, i *discordgo.InteractionCreate) {
+	if handler, ok := mm.ModalHandlers[identifiers.ModalCustomID(i.ModalSubmitData().CustomID)]; ok {
 		handler.Handler(s, i)
 	}
 }
 
-func (mm *ModalManager) GetModalByCustomID(customID identifiers.CustomID) *ModalInteraction {
+func (mm *modalManager) modalInteraction(customID identifiers.ModalCustomID) *ModalInteraction {
 	return mm.ModalHandlers[customID]
 }
