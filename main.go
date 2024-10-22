@@ -4,7 +4,7 @@ import (
 	"log"
 	"os"
 
-	"turnbot/botlogic"
+	"turnbot/botinit"
 	"turnbot/game"
 
 	"github.com/bwmarrin/discordgo"
@@ -38,8 +38,8 @@ func main() {
 
 	//TODO utilize/learn state type
 
-	interactionLogicLoader := &botlogic.BotInteractionLogicLoader{}
-	guildLogicLoader := &botlogic.BotGuildLogicLoader{}
+	interactionLogicLoader := &botinit.BotInteractionsInitLoader{}
+	guildLogicLoader := &botinit.BotGuildInitLoader{}
 	engine, err := game.NewGameEngine(s, interactionLogicLoader, guildLogicLoader)
 	if err != nil {
 		log.Fatalf("error creating new game engine: %s", err)

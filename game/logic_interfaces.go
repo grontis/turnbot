@@ -1,6 +1,6 @@
 package game
 
-type InteractionLogicLoader interface {
+type InteractionsInitLoader interface {
 	LoadButtonInteractions(engine *GameEngine)
 	LoadCommandInteractions(engine *GameEngine)
 	LoadDropdownInteractions(engine *GameEngine)
@@ -9,6 +9,6 @@ type InteractionLogicLoader interface {
 	CreateAllCommands(engine *GameEngine)
 }
 
-type GuildLogicLoader interface {
+type GuildInitLoader interface {
 	SetupBotChannels(engine *GameEngine, guildID string) error
 }

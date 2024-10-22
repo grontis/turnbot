@@ -1,4 +1,4 @@
-package botlogic
+package botinit
 
 import (
 	"fmt"
@@ -6,9 +6,9 @@ import (
 	"turnbot/game"
 )
 
-type BotGuildLogicLoader struct{}
+type BotGuildInitLoader struct{}
 
-func (b *BotGuildLogicLoader) SetupBotChannels(engine *game.GameEngine, guildID string) error {
+func (b *BotGuildInitLoader) SetupBotChannels(engine *game.GameEngine, guildID string) error {
 	turnbotCategoryName := "turnbot"
 	turnbotCategory, err := engine.GuildManager.TryCreateCategory(turnbotCategoryName)
 	if err != nil {

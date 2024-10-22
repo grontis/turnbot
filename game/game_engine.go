@@ -17,14 +17,20 @@ var guildID string
 
 type GameEngine struct {
 	Session                *discordgo.Session
-	InteractionLogicLoader InteractionLogicLoader
-	GuildLogicLoader       GuildLogicLoader
+	InteractionsInitLoader InteractionsInitLoader
+	GuildInitLoader        GuildInitLoader
 	InteractionManager     *interactions.InteractionManager
 	GuildManager           *guild.GuildManager
 	PlayerCharacters       []Character
 }
 
-func NewGameEngine(s *discordgo.Session, interactionLogicLoader InteractionLogicLoader, guildLogicLoader GuildLogicLoader) (*GameEngine, error) {
+func NewGameEngine(s *discordgo.Session, interactionsInitLoader InteractionsInitLoader, guildInitLoader GuildInitLoader) (*GameEngine, error) {
+	//TODO more dynamically use guildIDs
+	err := godotenv.Load()
+	if err != nil {
+		log.Fatalf("Error loading .env file")
+	}
+	guildID = os.Getenv("GUILD_ID")
 	guildManager, err := guild.NewGuildManager(s, guildID)
 	if err != nil {
 		return nil, err
@@ -32,19 +38,12 @@ func NewGameEngine(s *discordgo.Session, interactionLogicLoader InteractionLogic
 
 	engine := &GameEngine{
 		Session:                s,
-		InteractionLogicLoader: interactionLogicLoader,
-		GuildLogicLoader:       guildLogicLoader,
+		InteractionsInitLoader: interactionsInitLoader,
+		GuildInitLoader:        guildInitLoader,
 		InteractionManager:     interactions.NewInteractionManager(s),
 		GuildManager:           guildManager,
 		PlayerCharacters:       make([]Character, 0),
 	}
-
-	//TODO more dynamically use guildIDs
-	err = godotenv.Load()
-	if err != nil {
-		log.Fatalf("Error loading .env file")
-	}
-	guildID = os.Getenv("GUILD_ID")
 
 	engine.init()
 
@@ -55,11 +54,11 @@ func (ge *GameEngine) init() {
 	//TODO this kind of operation might be a good scenario to define an error type for less repetition?
 	//https://go.dev/blog/errors-are-values
 
-	ge.InteractionLogicLoader.LoadButtonInteractions(ge)
-	ge.InteractionLogicLoader.LoadCommandInteractions(ge)
-	ge.InteractionLogicLoader.LoadDropdownInteractions(ge)
-	ge.InteractionLogicLoader.LoadModalInteractions(ge)
-	ge.InteractionLogicLoader.LoadInteractionsHandler(ge)
+	ge.InteractionsInitLoader.LoadButtonInteractions(ge)
+	ge.InteractionsInitLoader.LoadCommandInteractions(ge)
+	ge.InteractionsInitLoader.LoadDropdownInteractions(ge)
+	ge.InteractionsInitLoader.LoadModalInteractions(ge)
+	ge.InteractionsInitLoader.LoadInteractionsHandler(ge)
 }
 
 func (ge *GameEngine) Run() {
@@ -71,9 +70,13 @@ func (ge *GameEngine) Run() {
 	}
 
 	//It appears that commands can only be added to discord after the session has been opened?
-	ge.InteractionLogicLoader.CreateAllCommands(ge)
+	ge.InteractionsInitLoader.CreateAllCommands(ge)
 
-	ge.GuildLogicLoader.SetupBotChannels(ge, guildID)
+	ge.GuildInitLoader.SetupBotChannels(ge, guildID)
+
+	//TODO struct property to manage various channels for the game
+
+	//TODO character creation workflow
 
 	awaitTerminateSignal()
 	ge.Session.Close()

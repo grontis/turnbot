@@ -11,29 +11,28 @@ type channelKey struct {
 	ParentID string
 }
 
-// TODO encapsulate members
-type ChannelManager struct {
+type channelManager struct {
 	Session  *discordgo.Session
 	GuildID  string
 	Channels map[channelKey]*discordgo.Channel
 	//TODO categories property?
 }
 
-func NewChannelManager(s *discordgo.Session, guildID string) (*ChannelManager, error) {
+func newChannelManager(s *discordgo.Session, guildID string) (*channelManager, error) {
 	channels, err := getGuildChannelMap(s, guildID)
 	if err != nil {
 		return nil, err
 	}
 
-	return &ChannelManager{
+	return &channelManager{
 		Session:  s,
 		GuildID:  guildID,
 		Channels: channels,
 	}, nil
 }
 
-func (cm *ChannelManager) TryCreateCategory(categoryName string) (*discordgo.Channel, error) {
-	category := cm.CategoryByName(categoryName)
+func (cm *channelManager) tryCreateCategory(categoryName string) (*discordgo.Channel, error) {
+	category := cm.categoryByName(categoryName)
 	if category != nil {
 		return category, nil
 	}
@@ -49,7 +48,7 @@ func (cm *ChannelManager) TryCreateCategory(categoryName string) (*discordgo.Cha
 }
 
 // Find category channel by name. Returns nil if none found. (discord categories are represented as discordgo.Channel type)
-func (cm *ChannelManager) CategoryByName(categoryName string) *discordgo.Channel {
+func (cm *channelManager) categoryByName(categoryName string) *discordgo.Channel {
 	for _, channel := range cm.Channels {
 		if channel.Name == categoryName && channel.Type == discordgo.ChannelTypeGuildCategory {
 			return channel
@@ -60,8 +59,8 @@ func (cm *ChannelManager) CategoryByName(categoryName string) *discordgo.Channel
 }
 
 // First tries to retrieve an existing channel. If not found, will attempt to create channel.
-func (cm *ChannelManager) TryCreateChannelUnderCategory(channelName string, categoryID string) (*discordgo.Channel, error) {
-	channel := cm.ChannelByName(channelName, categoryID)
+func (cm *channelManager) tryCreateChannelUnderCategory(channelName string, categoryID string) (*discordgo.Channel, error) {
+	channel := cm.channelByName(channelName, categoryID)
 	if channel != nil {
 		return channel, nil
 	}
@@ -76,11 +75,11 @@ func (cm *ChannelManager) TryCreateChannelUnderCategory(channelName string, cate
 	return channel, nil
 }
 
-func (cm *ChannelManager) ChannelByName(channelName string, categoryID string) *discordgo.Channel {
+func (cm *channelManager) channelByName(channelName string, categoryID string) *discordgo.Channel {
 	return cm.Channels[channelKey{Name: channelName, ParentID: categoryID}]
 }
 
-func (cm *ChannelManager) ChannelsUnderCategory(categoryName string) []*discordgo.Channel {
+func (cm *channelManager) channelsUnderCategory(categoryName string) []*discordgo.Channel {
 	var result []*discordgo.Channel
 	var categoryID string
 
@@ -105,7 +104,7 @@ func (cm *ChannelManager) ChannelsUnderCategory(categoryName string) []*discordg
 	return result
 }
 
-func (cm *ChannelManager) createCategory(categoryName string) (*discordgo.Channel, error) {
+func (cm *channelManager) createCategory(categoryName string) (*discordgo.Channel, error) {
 	category, err := cm.Session.GuildChannelCreateComplex(cm.GuildID, discordgo.GuildChannelCreateData{
 		Name: categoryName,
 		Type: discordgo.ChannelTypeGuildCategory,
@@ -115,7 +114,7 @@ func (cm *ChannelManager) createCategory(categoryName string) (*discordgo.Channe
 }
 
 // TODO more generic createComplexChannel function?
-func (cm *ChannelManager) createChannelUnderCategory(channelName string, categoryID string) (*discordgo.Channel, error) {
+func (cm *channelManager) createChannelUnderCategory(channelName string, categoryID string) (*discordgo.Channel, error) {
 	channel, err := cm.Session.GuildChannelCreateComplex(cm.GuildID, discordgo.GuildChannelCreateData{
 		Name:     channelName,
 		Type:     discordgo.ChannelTypeGuildText,
