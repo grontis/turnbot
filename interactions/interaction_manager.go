@@ -37,6 +37,7 @@ func (im *InteractionManager) HandleCommandInteraction(i *discordgo.InteractionC
 	im.commandManager.handleCommandInteraction(im.Session, i)
 }
 
+// Create registered commands in discord. Discord API will throw an error if this is called before the session is opened
 func (im *InteractionManager) CreateAllCommands() error {
 	err := im.commandManager.createAllCommands(im.Session)
 	return err

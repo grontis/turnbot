@@ -7,6 +7,7 @@ import (
 	"os/signal"
 	"syscall"
 	"turnbot/guild"
+	"turnbot/identifiers"
 	"turnbot/interactions"
 
 	"github.com/bwmarrin/discordgo"
@@ -77,14 +78,22 @@ func (ge *GameEngine) Run() {
 	//TODO struct property to manage various channels for the game
 
 	//TODO character creation workflow
+	ge.startCharacterCreation()
 
 	awaitTerminateSignal()
 	ge.Session.Close()
 }
 
 func awaitTerminateSignal() {
-	fmt.Printf("Bot is running. Press CTRL+C to exit.")
+	fmt.Println("Bot is running. Press CTRL+C to exit.")
 	sc := make(chan os.Signal, 1)
 	signal.Notify(sc, syscall.SIGINT, syscall.SIGTERM, os.Interrupt)
 	<-sc
+}
+
+func (ge *GameEngine) startCharacterCreation() {
+	err := ge.InteractionManager.SendButtonMessage("", identifiers.ButtonStartCharacterCreationCustomID, "Create a character!")
+	if err != nil {
+		fmt.Println("error sending message:", err)
+	}
 }

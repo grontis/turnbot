@@ -12,7 +12,43 @@ import (
 
 type BotInteractionsInitLoader struct{}
 
+// Create registered commands in discord. Discord API will throw an error if this is called before the session is opened.
+func (b *BotInteractionsInitLoader) CreateAllCommands(engine *game.GameEngine) {
+	engine.InteractionManager.CreateAllCommands()
+}
+
+// Load the button interactions defined in this method into the game engine.
 func (b *BotInteractionsInitLoader) LoadButtonInteractions(engine *game.GameEngine) {
+	engine.InteractionManager.AddButtonInteraction(&interactions.ButtonInteraction{
+		CustomID: identifiers.ButtonStartCharacterCreationCustomID,
+		Label:    "Start Character Creation",
+		Style:    discordgo.PrimaryButton,
+		Handler: func(s *discordgo.Session, i *discordgo.InteractionCreate) {
+			engine.InteractionManager.SendButtonMessage(i.ChannelID, identifiers.ButtonOpenCharacterInfoModalCustomID, "Enter character details")
+			engine.InteractionManager.SendDropdownMessage(i.ChannelID, identifiers.DropdownClassSelectCustomID, "Select your class")
+			//TODO need to design a way to await and event when BOTH of these interactions are processed (go channels?)
+
+			err := s.ChannelMessageDelete(i.ChannelID, i.Message.ID)
+			if err != nil {
+				fmt.Println("Error deleting message:", err)
+			}
+
+			s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+				Type: discordgo.InteractionResponseDeferredMessageUpdate, // Acknowledge interaction
+			})
+		},
+	})
+
+	engine.InteractionManager.AddButtonInteraction(&interactions.ButtonInteraction{
+		CustomID: identifiers.ButtonOpenCharacterInfoModalCustomID,
+		Label:    "Enter character info",
+		Style:    discordgo.PrimaryButton,
+		Handler: func(s *discordgo.Session, i *discordgo.InteractionCreate) {
+			modalResponse := engine.InteractionManager.ModalInteractionResponse(identifiers.ModalCharacterInfoCustomID)
+			s.InteractionRespond(i.Interaction, modalResponse)
+		},
+	})
+
 	engine.InteractionManager.AddButtonInteraction(&interactions.ButtonInteraction{
 		CustomID: identifiers.ButtonDiceRollCustomID,
 		Label:    "Roll 1d6 🎲",
@@ -27,18 +63,9 @@ func (b *BotInteractionsInitLoader) LoadButtonInteractions(engine *game.GameEngi
 			})
 		},
 	})
-
-	engine.InteractionManager.AddButtonInteraction(&interactions.ButtonInteraction{
-		CustomID: identifiers.ButtonOpenCharacterInfoModalCustomID,
-		Label:    "Enter character info",
-		Style:    discordgo.PrimaryButton,
-		Handler: func(s *discordgo.Session, i *discordgo.InteractionCreate) {
-			modalResponse := engine.InteractionManager.ModalInteractionResponse(identifiers.ModalCharacterInfoCustomID)
-			s.InteractionRespond(i.Interaction, modalResponse)
-		},
-	})
 }
 
+// Load the command interactions defined in this method into the game engine.
 func (b *BotInteractionsInitLoader) LoadCommandInteractions(engine *game.GameEngine) {
 	engine.InteractionManager.AddCommandInteraction(&interactions.CommandInteraction{
 		Name:        "hello", //TODO identifiers.CommandName type
@@ -54,6 +81,7 @@ func (b *BotInteractionsInitLoader) LoadCommandInteractions(engine *game.GameEng
 	})
 }
 
+// Load the dropdown interactions defined in this method into the game engine.
 func (b *BotInteractionsInitLoader) LoadDropdownInteractions(engine *game.GameEngine) {
 	engine.InteractionManager.AddDropdownInteraction(&interactions.DropdownInteraction{
 		CustomID:    identifiers.DropdownClassSelectCustomID,
@@ -89,6 +117,7 @@ func (b *BotInteractionsInitLoader) LoadDropdownInteractions(engine *game.GameEn
 	})
 }
 
+// Load the interactions handling defined in this method into the game engine.
 func (b *BotInteractionsInitLoader) LoadInteractionsHandler(engine *game.GameEngine) {
 	engine.InteractionManager.AddInteractionHandler(func(s *discordgo.Session, i *discordgo.InteractionCreate) {
 		switch i.Type {
@@ -115,6 +144,7 @@ func (b *BotInteractionsInitLoader) LoadInteractionsHandler(engine *game.GameEng
 	})
 }
 
+// Load the modal interactions defined in this method into the game engine.
 func (b *BotInteractionsInitLoader) LoadModalInteractions(engine *game.GameEngine) {
 	engine.InteractionManager.AddModalInteraction(&interactions.ModalInteraction{
 		CustomID: identifiers.ModalCharacterInfoCustomID,
@@ -154,8 +184,4 @@ func (b *BotInteractionsInitLoader) LoadModalInteractions(engine *game.GameEngin
 			})
 		},
 	})
-}
-
-func (b *BotInteractionsInitLoader) CreateAllCommands(engine *game.GameEngine) {
-	engine.InteractionManager.CreateAllCommands()
 }

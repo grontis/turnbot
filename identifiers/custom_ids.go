@@ -3,6 +3,7 @@ package identifiers
 type ButtonCustomID string
 
 const (
+	ButtonStartCharacterCreationCustomID ButtonCustomID = "button_start_character_creation"
 	ButtonDiceRollCustomID               ButtonCustomID = "button_dice_roll"
 	ButtonOpenCharacterInfoModalCustomID ButtonCustomID = "button_open_character_info_modal"
 )
