@@ -18,20 +18,29 @@ var guildID string
 type GameEngine struct {
 	Session                *discordgo.Session
 	InteractionLogicLoader InteractionLogicLoader
+	GuildLogicLoader       GuildLogicLoader
 	InteractionManager     *interactions.InteractionManager
+	GuildManager           *guild.GuildManager
 	PlayerCharacters       []Character
 }
 
-func NewGameEngine(s *discordgo.Session, interactionLogicLoader InteractionLogicLoader) *GameEngine {
+func NewGameEngine(s *discordgo.Session, interactionLogicLoader InteractionLogicLoader, guildLogicLoader GuildLogicLoader) (*GameEngine, error) {
+	guildManager, err := guild.NewGuildManager(s, guildID)
+	if err != nil {
+		return nil, err
+	}
+
 	engine := &GameEngine{
 		Session:                s,
 		InteractionLogicLoader: interactionLogicLoader,
+		GuildLogicLoader:       guildLogicLoader,
 		InteractionManager:     interactions.NewInteractionManager(s),
+		GuildManager:           guildManager,
 		PlayerCharacters:       make([]Character, 0),
 	}
 
 	//TODO more dynamically use guildIDs
-	err := godotenv.Load()
+	err = godotenv.Load()
 	if err != nil {
 		log.Fatalf("Error loading .env file")
 	}
@@ -39,7 +48,7 @@ func NewGameEngine(s *discordgo.Session, interactionLogicLoader InteractionLogic
 
 	engine.init()
 
-	return engine
+	return engine, nil
 }
 
 func (ge *GameEngine) init() {
@@ -62,26 +71,9 @@ func (ge *GameEngine) Run() {
 	}
 
 	//It appears that commands can only be added to discord after the session has been opened?
-	//TODO better design for this?
-	ge.InteractionManager.CreateAllCommands()
+	ge.InteractionLogicLoader.CreateAllCommands(ge)
 
-	guildManager, err := guild.NewGuildManager(ge.Session, guildID)
-	if err != nil {
-		log.Printf("error creating guild manager: %s", err)
-	}
-	turnbotCategoryName := "turnbot"
-	turnbotCategory, err := guildManager.TryCreateCategory(turnbotCategoryName)
-	if err != nil {
-		log.Printf("error creating category %s: %s", turnbotCategoryName, err)
-	}
-
-	channel, err := guildManager.TryCreateChannelUnderCategory("bot-test", turnbotCategory.ID)
-	if err != nil {
-		fmt.Printf("error creating channel: %s", err)
-		return
-	}
-
-	fmt.Printf("channel: %s (ID: %s)\n", channel.Name, channel.ID)
+	ge.GuildLogicLoader.SetupBotChannels(ge, guildID)
 
 	awaitTerminateSignal()
 	ge.Session.Close()

@@ -32,13 +32,19 @@ func initSession() (*discordgo.Session, error) {
 func main() {
 	s, err := initSession()
 	if err != nil {
-		log.Printf("error initializing session: %s", err)
+		log.Fatalf("error initializing discord api session: %s", err)
 		return
 	}
 
 	//TODO utilize/learn state type
-	interactionLoader := &botlogic.BotInteractionLoader{}
-	engine := game.NewGameEngine(s, interactionLoader)
+
+	interactionLogicLoader := &botlogic.BotInteractionLogicLoader{}
+	guildLogicLoader := &botlogic.BotGuildLogicLoader{}
+	engine, err := game.NewGameEngine(s, interactionLogicLoader, guildLogicLoader)
+	if err != nil {
+		log.Fatalf("error creating new game engine: %s", err)
+	}
+
 	engine.Run()
 }
 

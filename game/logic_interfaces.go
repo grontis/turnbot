@@ -6,4 +6,9 @@ type InteractionLogicLoader interface {
 	LoadDropdownInteractions(engine *GameEngine)
 	LoadModalInteractions(engine *GameEngine)
 	LoadInteractionsHandler(engine *GameEngine)
+	CreateAllCommands(engine *GameEngine)
+}
+
+type GuildLogicLoader interface {
+	SetupBotChannels(engine *GameEngine, guildID string) error
 }

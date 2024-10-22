@@ -10,9 +10,9 @@ import (
 	"github.com/bwmarrin/discordgo"
 )
 
-type BotInteractionLoader struct{}
+type BotInteractionLogicLoader struct{}
 
-func (b *BotInteractionLoader) LoadButtonInteractions(engine *game.GameEngine) {
+func (b *BotInteractionLogicLoader) LoadButtonInteractions(engine *game.GameEngine) {
 	engine.InteractionManager.AddButtonInteraction(&interactions.ButtonInteraction{
 		CustomID: identifiers.ButtonDiceRollCustomID,
 		Label:    "Roll 1d6 🎲",
@@ -39,7 +39,7 @@ func (b *BotInteractionLoader) LoadButtonInteractions(engine *game.GameEngine) {
 	})
 }
 
-func (b *BotInteractionLoader) LoadCommandInteractions(engine *game.GameEngine) {
+func (b *BotInteractionLogicLoader) LoadCommandInteractions(engine *game.GameEngine) {
 	engine.InteractionManager.AddCommandInteraction(&interactions.CommandInteraction{
 		Name:        "hello", //TODO identifiers.CommandName type
 		Description: "Says hello!",
@@ -54,7 +54,7 @@ func (b *BotInteractionLoader) LoadCommandInteractions(engine *game.GameEngine) 
 	})
 }
 
-func (b *BotInteractionLoader) LoadDropdownInteractions(engine *game.GameEngine) {
+func (b *BotInteractionLogicLoader) LoadDropdownInteractions(engine *game.GameEngine) {
 	engine.InteractionManager.AddDropdownInteraction(&interactions.DropdownInteraction{
 		CustomID:    identifiers.DropdownClassSelectCustomID,
 		Placeholder: "Select your character's class",
@@ -89,7 +89,7 @@ func (b *BotInteractionLoader) LoadDropdownInteractions(engine *game.GameEngine)
 	})
 }
 
-func (b *BotInteractionLoader) LoadInteractionsHandler(engine *game.GameEngine) {
+func (b *BotInteractionLogicLoader) LoadInteractionsHandler(engine *game.GameEngine) {
 	engine.InteractionManager.AddInteractionHandler(func(s *discordgo.Session, i *discordgo.InteractionCreate) {
 		switch i.Type {
 		case discordgo.InteractionApplicationCommand:
@@ -115,7 +115,7 @@ func (b *BotInteractionLoader) LoadInteractionsHandler(engine *game.GameEngine) 
 	})
 }
 
-func (b *BotInteractionLoader) LoadModalInteractions(engine *game.GameEngine) {
+func (b *BotInteractionLogicLoader) LoadModalInteractions(engine *game.GameEngine) {
 	engine.InteractionManager.AddModalInteraction(&interactions.ModalInteraction{
 		CustomID: identifiers.ModalCharacterInfoCustomID,
 		Title:    "Enter Your Character's Info",
@@ -154,4 +154,8 @@ func (b *BotInteractionLoader) LoadModalInteractions(engine *game.GameEngine) {
 			})
 		},
 	})
+}
+
+func (b *BotInteractionLogicLoader) CreateAllCommands(engine *game.GameEngine) {
+	engine.InteractionManager.CreateAllCommands()
 }
