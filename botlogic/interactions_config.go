@@ -1,7 +1,8 @@
-package game
+package botlogic
 
 import (
 	"fmt"
+	"turnbot/game"
 	"turnbot/identifiers"
 	"turnbot/interactions"
 	"turnbot/utils"
@@ -9,7 +10,9 @@ import (
 	"github.com/bwmarrin/discordgo"
 )
 
-func loadButtonInteractions(engine *GameEngine) {
+type BotInteractionLoader struct{}
+
+func (b *BotInteractionLoader) LoadButtonInteractions(engine *game.GameEngine) {
 	engine.InteractionManager.AddButtonInteraction(&interactions.ButtonInteraction{
 		CustomID: identifiers.ButtonDiceRollCustomID,
 		Label:    "Roll 1d6 🎲",
@@ -36,7 +39,7 @@ func loadButtonInteractions(engine *GameEngine) {
 	})
 }
 
-func loadCommandInteractions(engine *GameEngine) {
+func (b *BotInteractionLoader) LoadCommandInteractions(engine *game.GameEngine) {
 	engine.InteractionManager.AddCommandInteraction(&interactions.CommandInteraction{
 		Name:        "hello", //TODO identifiers.CommandName type
 		Description: "Says hello!",
@@ -51,7 +54,7 @@ func loadCommandInteractions(engine *GameEngine) {
 	})
 }
 
-func loadDropdownInteractions(engine *GameEngine) {
+func (b *BotInteractionLoader) LoadDropdownInteractions(engine *game.GameEngine) {
 	engine.InteractionManager.AddDropdownInteraction(&interactions.DropdownInteraction{
 		CustomID:    identifiers.DropdownClassSelectCustomID,
 		Placeholder: "Select your character's class",
@@ -86,7 +89,7 @@ func loadDropdownInteractions(engine *GameEngine) {
 	})
 }
 
-func loadInteractionsHandler(engine *GameEngine) {
+func (b *BotInteractionLoader) LoadInteractionsHandler(engine *game.GameEngine) {
 	engine.InteractionManager.AddInteractionHandler(func(s *discordgo.Session, i *discordgo.InteractionCreate) {
 		switch i.Type {
 		case discordgo.InteractionApplicationCommand:
@@ -100,19 +103,19 @@ func loadInteractionsHandler(engine *GameEngine) {
 			case discordgo.SelectMenuComponent:
 				engine.InteractionManager.HandleDropdownInteraction(i)
 			default:
-				fmt.Println("Unknown component type")
+				fmt.Printf("Unknown component type")
 			}
 
 		case discordgo.InteractionModalSubmit:
 			engine.InteractionManager.HandleModalInteraction(i)
 
 		default:
-			fmt.Println("Unknown interaction type")
+			fmt.Printf("Unknown interaction type")
 		}
 	})
 }
 
-func loadModalInteractions(engine *GameEngine) {
+func (b *BotInteractionLoader) LoadModalInteractions(engine *game.GameEngine) {
 	engine.InteractionManager.AddModalInteraction(&interactions.ModalInteraction{
 		CustomID: identifiers.ModalCharacterInfoCustomID,
 		Title:    "Enter Your Character's Info",

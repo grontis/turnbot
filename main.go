@@ -4,6 +4,7 @@ import (
 	"log"
 	"os"
 
+	"turnbot/botlogic"
 	"turnbot/game"
 
 	"github.com/bwmarrin/discordgo"
@@ -13,8 +14,6 @@ import (
 //TODO logging library
 
 var botToken string
-var guildID string
-var channelID string
 
 func initSession() (*discordgo.Session, error) {
 	err := godotenv.Load()
@@ -38,8 +37,8 @@ func main() {
 	}
 
 	//TODO utilize/learn state type
-
-	engine := game.NewGameEngine(s)
+	interactionLoader := &botlogic.BotInteractionLoader{}
+	engine := game.NewGameEngine(s, interactionLoader)
 	engine.Run()
 }
 

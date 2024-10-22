@@ -13,28 +13,28 @@ import (
 	"github.com/joho/godotenv"
 )
 
-var channelID string
 var guildID string
 
 type GameEngine struct {
-	Session            *discordgo.Session
-	InteractionManager *interactions.InteractionManager
-	PlayerCharacters   []Character
+	Session                *discordgo.Session
+	InteractionLogicLoader InteractionLogicLoader
+	InteractionManager     *interactions.InteractionManager
+	PlayerCharacters       []Character
 }
 
-func NewGameEngine(s *discordgo.Session) *GameEngine {
+func NewGameEngine(s *discordgo.Session, interactionLogicLoader InteractionLogicLoader) *GameEngine {
 	engine := &GameEngine{
-		Session:            s,
-		InteractionManager: interactions.NewInteractionManager(s),
-		PlayerCharacters:   make([]Character, 0),
+		Session:                s,
+		InteractionLogicLoader: interactionLogicLoader,
+		InteractionManager:     interactions.NewInteractionManager(s),
+		PlayerCharacters:       make([]Character, 0),
 	}
 
-	//TODO more dynamically use channel_ids
+	//TODO more dynamically use guildIDs
 	err := godotenv.Load()
 	if err != nil {
 		log.Fatalf("Error loading .env file")
 	}
-	channelID = os.Getenv("CHANNEL_ID")
 	guildID = os.Getenv("GUILD_ID")
 
 	engine.init()
@@ -46,18 +46,18 @@ func (ge *GameEngine) init() {
 	//TODO this kind of operation might be a good scenario to define an error type for less repetition?
 	//https://go.dev/blog/errors-are-values
 
-	loadButtonInteractions(ge)
-	loadCommandInteractions(ge)
-	loadDropdownInteractions(ge)
-	loadModalInteractions(ge)
-	loadInteractionsHandler(ge)
+	ge.InteractionLogicLoader.LoadButtonInteractions(ge)
+	ge.InteractionLogicLoader.LoadCommandInteractions(ge)
+	ge.InteractionLogicLoader.LoadDropdownInteractions(ge)
+	ge.InteractionLogicLoader.LoadModalInteractions(ge)
+	ge.InteractionLogicLoader.LoadInteractionsHandler(ge)
 }
 
 func (ge *GameEngine) Run() {
 
 	err := ge.Session.Open()
 	if err != nil {
-		fmt.Println("Error opening connection: ", err)
+		fmt.Printf("Error opening connection: %s", err)
 		return
 	}
 
@@ -65,17 +65,19 @@ func (ge *GameEngine) Run() {
 	//TODO better design for this?
 	ge.InteractionManager.CreateAllCommands()
 
-	categoryID := "1297794437036118026"
-	channelName := "foo-text"
-
-	channelManager, err := guild.NewChannelManager(ge.Session, guildID)
+	guildManager, err := guild.NewGuildManager(ge.Session, guildID)
 	if err != nil {
-		log.Printf("error creating channel manager: %s", err)
+		log.Printf("error creating guild manager: %s", err)
+	}
+	turnbotCategoryName := "turnbot"
+	turnbotCategory, err := guildManager.TryCreateCategory(turnbotCategoryName)
+	if err != nil {
+		log.Printf("error creating category %s: %s", turnbotCategoryName, err)
 	}
 
-	channel, err := channelManager.CreateChannelUnderCategory(channelName, categoryID)
+	channel, err := guildManager.TryCreateChannelUnderCategory("bot-test", turnbotCategory.ID)
 	if err != nil {
-		fmt.Println("Error creating channel:", err)
+		fmt.Printf("error creating channel: %s", err)
 		return
 	}
 
@@ -86,7 +88,7 @@ func (ge *GameEngine) Run() {
 }
 
 func awaitTerminateSignal() {
-	fmt.Println("Bot is running. Press CTRL+C to exit.")
+	fmt.Printf("Bot is running. Press CTRL+C to exit.")
 	sc := make(chan os.Signal, 1)
 	signal.Notify(sc, syscall.SIGINT, syscall.SIGTERM, os.Interrupt)
 	<-sc
