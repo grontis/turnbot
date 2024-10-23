@@ -43,7 +43,7 @@ func (cm *commandManager) createAllCommands(s *discordgo.Session) error {
 	if err != nil {
 		log.Fatalf("Error loading .env file")
 	}
-	guildID := os.Getenv("CHANNEL_ID")
+	guildID := os.Getenv("GUILD_ID")
 
 	for _, cmd := range cm.CommandInteractions {
 		_, err := s.ApplicationCommandCreate(s.State.User.ID, guildID, cmd.toCommand())
