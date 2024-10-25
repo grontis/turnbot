@@ -2,6 +2,7 @@ package botinit
 
 import (
 	"fmt"
+	"turnbot/events"
 	"turnbot/game"
 	"turnbot/identifiers"
 	"turnbot/interactions"
@@ -27,6 +28,14 @@ func (b *BotInteractionsInitLoader) LoadButtonInteractions(engine *game.GameEngi
 			engine.InteractionManager.SendButtonMessage(i.ChannelID, identifiers.ButtonOpenCharacterInfoModalCustomID, "Enter character details")
 			engine.InteractionManager.SendDropdownMessage(i.ChannelID, identifiers.DropdownClassSelectCustomID, "Select your class")
 			//TODO need to design a way to await and event when BOTH of these interactions are processed (go channels?)
+
+			//TODO publish event for character creation started
+			//inside of the handler of that, wait until it receives events for all of the other input components?
+
+			//TODO once all character creation flow is completed, send message with an overview of character to be created.
+			//with an option to redo creation/edit?
+
+			// engine.EventManager.Publish(events.EventCharacterClassSubmitted, "Wizard") //EXAMPLE publish event
 
 			err := s.ChannelMessageDelete(i.ChannelID, i.Message.ID)
 			if err != nil {
@@ -86,6 +95,9 @@ func (b *BotInteractionsInitLoader) LoadDropdownInteractions(engine *game.GameEn
 	engine.InteractionManager.AddDropdownInteraction(&interactions.DropdownInteraction{
 		CustomID:    identifiers.DropdownClassSelectCustomID,
 		Placeholder: "Select your character's class",
+
+		//TODO tie the options provided in this dropdown with the classes defined in game logic/rules
+		//that way a common identifier can be shared a reused, less error prone
 		Options: []discordgo.SelectMenuOption{
 			{
 				Label:       "Fighter",
@@ -105,14 +117,21 @@ func (b *BotInteractionsInitLoader) LoadDropdownInteractions(engine *game.GameEn
 		},
 		Handler: func(s *discordgo.Session, i *discordgo.InteractionCreate) {
 			// Get the selected value from the select menu
-			selectedColor := i.MessageComponentData().Values[0]
+			selectedValue := i.MessageComponentData().Values[0]
 
 			s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 				Type: discordgo.InteractionResponseChannelMessageWithSource,
 				Data: &discordgo.InteractionResponseData{
-					Content: fmt.Sprintf("You selected: %s", selectedColor),
+					Content: fmt.Sprintf("You selected: %s", selectedValue),
 				},
 			})
+
+			//TODO add "re-select" prompt?
+
+			engine.EventManager.Publish(events.EventCharacterClassSubmitted, selectedValue)
+
+			//TODO event out that a character class was submitted for a given user.
+			//TODO outside of this define event handler that will catch those kind of events
 		},
 	})
 }
@@ -174,6 +193,9 @@ func (b *BotInteractionsInitLoader) LoadModalInteractions(engine *game.GameEngin
 			},
 		},
 		Handler: func(s *discordgo.Session, i *discordgo.InteractionCreate) {
+			//TODO TextInput sanitation and validation. Extension method or middleware that can be used for all TextInput?
+			//Some kind of wrapper struct?
+
 			username := i.ModalSubmitData().Components[0].(*discordgo.ActionsRow).Components[0].(*discordgo.TextInput).Value
 			age := i.ModalSubmitData().Components[1].(*discordgo.ActionsRow).Components[0].(*discordgo.TextInput).Value
 			s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
@@ -182,6 +204,9 @@ func (b *BotInteractionsInitLoader) LoadModalInteractions(engine *game.GameEngin
 					Content: fmt.Sprintf("You entered: Username: %s, Age: %s", username, age),
 				},
 			})
+
+			//TODO event out that a character info was submitted for a given user.
+			//TODO outside of this define event handler that will catch those kind of events
 		},
 	})
 }

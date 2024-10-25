@@ -52,6 +52,10 @@ func (im *InteractionManager) HandleButtonInteraction(i *discordgo.InteractionCr
 }
 
 func (im *InteractionManager) SendButtonMessage(channelID string, customID identifiers.ButtonCustomID, content string) error {
+	if channelID == "" {
+		return fmt.Errorf("channelID is empty")
+	}
+
 	button := im.buttonManager.buttonInteraction(customID)
 	if button == nil {
 		return fmt.Errorf("no button found with CustomID: %s", customID)
