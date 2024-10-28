@@ -103,6 +103,11 @@ func (ge *GameEngine) StartEventListeners() {
 	characterCreatedChan := make(chan interface{})
 	classSelectedChan := make(chan interface{})
 
+	//TODO generic event struct or interface, this may require redesigning how subscriptions are registered
+	//the goal of this is to allow for less verbose handling of events
+	//the event struct would have a Handler func defined on it that could be called as events come on the channel
+	//in this case only one channel for events would be necessary?
+
 	// Subscribe to character creation event
 	ge.EventManager.Subscribe(events.EventCharacterInfoSubmitted, characterCreatedChan)
 	go func() {
