@@ -3,8 +3,9 @@ package events
 type EventType string
 
 const (
-	EventCharacterInfoSubmitted  EventType = "event_character_info_submit"
-	EventCharacterClassSubmitted EventType = "event_character_class_submit"
+	EventCharacterCreationStarted EventType = "EventCharacterCreationStarted"
+	EventCharacterInfoSubmitted   EventType = "EventCharacterInfoSubmitted"
+	EventCharacterClassSubmitted  EventType = "EventCharacterClassSubmitted"
 )
 
 type EventHandler func(data interface{})

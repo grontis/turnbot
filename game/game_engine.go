@@ -64,16 +64,12 @@ func NewGameEngine(s *discordgo.Session, interactionsInitLoader InteractionsInit
 }
 
 func (ge *GameEngine) init() {
-	//TODO this kind of operation might be a good scenario to define an error type for less repetition?
-	//https://go.dev/blog/errors-are-values
-
 	ge.InteractionsInitLoader.LoadButtonInteractions(ge)
 	ge.InteractionsInitLoader.LoadCommandInteractions(ge)
 	ge.InteractionsInitLoader.LoadDropdownInteractions(ge)
 	ge.InteractionsInitLoader.LoadModalInteractions(ge)
 	ge.InteractionsInitLoader.LoadInteractionsHandler(ge)
 
-	//TODO does the event manager belong here? singleton instead?
 	ge.StartEventListeners()
 }
 
@@ -85,7 +81,7 @@ func (ge *GameEngine) Run() {
 		return
 	}
 
-	//It appears that commands can only be added to discord after the session has been opened?
+	//It appears that slash commands can only be added to discord after the session has been opened?
 	ge.InteractionsInitLoader.CreateAllCommands(ge)
 
 	ge.GuildInitLoader.SetupBotChannels(ge, guildID)
@@ -100,6 +96,13 @@ func (ge *GameEngine) Run() {
 }
 
 func (ge *GameEngine) StartEventListeners() {
+	ge.EventManager.Subscribe(events.Subscription{
+		EventType: events.EventCharacterCreationStarted,
+		Handler: func(data interface{}) {
+			fmt.Println("Character creation started for user: ", data)
+		},
+	})
+
 	ge.EventManager.Subscribe(events.Subscription{
 		EventType: events.EventCharacterInfoSubmitted,
 		Handler: func(data interface{}) {

@@ -18,24 +18,21 @@ func (b *BotInteractionsInitLoader) CreateAllCommands(engine *game.GameEngine) {
 	engine.InteractionManager.CreateAllCommands()
 }
 
-// Load the button interactions defined in this method into the game engine.
 func (b *BotInteractionsInitLoader) LoadButtonInteractions(engine *game.GameEngine) {
 	engine.InteractionManager.AddButtonInteraction(&interactions.ButtonInteraction{
 		CustomID: identifiers.ButtonStartCharacterCreationCustomID,
 		Label:    "Start Character Creation",
 		Style:    discordgo.PrimaryButton,
 		Handler: func(s *discordgo.Session, i *discordgo.InteractionCreate) {
+			userID := getUserIDFromInteraction(i)
+
+			engine.EventManager.Publish(events.Event{
+				EventType: events.EventCharacterCreationStarted,
+				Data:      userID,
+			})
+
 			engine.InteractionManager.SendButtonMessage(i.ChannelID, identifiers.ButtonOpenCharacterInfoModalCustomID, "Enter character details")
 			engine.InteractionManager.SendDropdownMessage(i.ChannelID, identifiers.DropdownClassSelectCustomID, "Select your class")
-			//TODO need to design a way to await and event when BOTH of these interactions are processed (go channels?)
-
-			//TODO publish event for character creation started
-			//inside of the handler of that, wait until it receives events for all of the other input components?
-
-			//TODO once all character creation flow is completed, send message with an overview of character to be created.
-			//with an option to redo creation/edit?
-
-			// engine.EventManager.Publish(events.EventCharacterClassSubmitted, "Wizard") //EXAMPLE publish event
 
 			err := s.ChannelMessageDelete(i.ChannelID, i.Message.ID)
 			if err != nil {
@@ -43,7 +40,7 @@ func (b *BotInteractionsInitLoader) LoadButtonInteractions(engine *game.GameEngi
 			}
 
 			s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
-				Type: discordgo.InteractionResponseDeferredMessageUpdate, // Acknowledge interaction
+				Type: discordgo.InteractionResponseDeferredMessageUpdate,
 			})
 		},
 	})
@@ -198,7 +195,6 @@ func (b *BotInteractionsInitLoader) LoadModalInteractions(engine *game.GameEngin
 		Handler: func(s *discordgo.Session, i *discordgo.InteractionCreate) {
 			//TODO TextInput sanitation and validation. Extension method or middleware that can be used for all TextInput?
 			//Some kind of wrapper struct?
-
 			username := i.ModalSubmitData().Components[0].(*discordgo.ActionsRow).Components[0].(*discordgo.TextInput).Value
 			age := i.ModalSubmitData().Components[1].(*discordgo.ActionsRow).Components[0].(*discordgo.TextInput).Value
 			s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
@@ -207,9 +203,21 @@ func (b *BotInteractionsInitLoader) LoadModalInteractions(engine *game.GameEngin
 					Content: fmt.Sprintf("You entered: Username: %s, Age: %s", username, age),
 				},
 			})
-
-			//TODO event out that a character info was submitted for a given user.
-			//TODO outside of this define event handler that will catch those kind of events
 		},
 	})
+}
+
+func getUserIDFromInteraction(i *discordgo.InteractionCreate) string {
+	var userID string
+	//i.User.ID only used for DMs
+	if i.User != nil {
+		userID = i.User.ID
+	}
+
+	//i.Member.User.ID only used for within guilds
+	if i.Member != nil {
+		userID = i.Member.User.ID
+	}
+
+	return userID
 }
