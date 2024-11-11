@@ -128,7 +128,10 @@ func (b *BotInteractionsInitLoader) LoadDropdownInteractions(engine *game.GameEn
 
 			//TODO add "re-select" prompt?
 
-			engine.EventManager.Publish(events.EventCharacterClassSubmitted, selectedValue)
+			engine.EventManager.Publish(events.Event{
+				EventType: events.EventCharacterClassSubmitted,
+				Data:      selectedValue,
+			})
 
 			//TODO event out that a character class was submitted for a given user.
 			//TODO outside of this define event handler that will catch those kind of events

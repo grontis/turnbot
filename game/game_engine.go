@@ -100,31 +100,19 @@ func (ge *GameEngine) Run() {
 }
 
 func (ge *GameEngine) StartEventListeners() {
-	characterCreatedChan := make(chan interface{})
-	classSelectedChan := make(chan interface{})
+	ge.EventManager.Subscribe(events.Subscription{
+		EventType: events.EventCharacterInfoSubmitted,
+		Handler: func(data interface{}) {
+			fmt.Println("Character info Event Received:", data)
+		},
+	})
 
-	//TODO generic event struct or interface, this may require redesigning how subscriptions are registered
-	//the goal of this is to allow for less verbose handling of events
-	//the event struct would have a Handler func defined on it that could be called as events come on the channel
-	//in this case only one channel for events would be necessary?
-
-	// Subscribe to character creation event
-	ge.EventManager.Subscribe(events.EventCharacterInfoSubmitted, characterCreatedChan)
-	go func() {
-		for event := range characterCreatedChan {
-			fmt.Println("Character info Event Received:", event)
-			// Handle character creation logic here
-		}
-	}()
-
-	// Subscribe to class selection event
-	ge.EventManager.Subscribe(events.EventCharacterClassSubmitted, classSelectedChan)
-	go func() {
-		for event := range classSelectedChan {
-			fmt.Println("Class Selected Event Received:", event)
-			// Handle class selection logic here
-		}
-	}()
+	ge.EventManager.Subscribe(events.Subscription{
+		EventType: events.EventCharacterClassSubmitted,
+		Handler: func(data interface{}) {
+			fmt.Println("Class Selected Event Received:", data)
+		},
+	})
 }
 
 func awaitTerminateSignal() {
