@@ -5,7 +5,9 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
+	"time"
 	"turnbot/events"
 	"turnbot/guild"
 	"turnbot/identifiers"
@@ -22,7 +24,6 @@ import (
 //engine could just handle registering the discord interactions and setup
 
 var guildID string
-var channelID string
 
 type GameEngine struct {
 	Session                *discordgo.Session
@@ -31,7 +32,7 @@ type GameEngine struct {
 	GuildInitLoader        GuildInitLoader
 	InteractionManager     *interactions.InteractionManager
 	GuildManager           *guild.GuildManager
-	PlayerCharacters       []Character
+	CharacterManager       *CharacterManager
 }
 
 func NewGameEngine(s *discordgo.Session, interactionsInitLoader InteractionsInitLoader, guildInitLoader GuildInitLoader) (*GameEngine, error) {
@@ -41,7 +42,6 @@ func NewGameEngine(s *discordgo.Session, interactionsInitLoader InteractionsInit
 		log.Fatalf("Error loading .env file")
 	}
 	guildID = os.Getenv("GUILD_ID")
-	channelID = os.Getenv("CHANNEL_ID")
 
 	guildManager, err := guild.NewGuildManager(s, guildID)
 	if err != nil {
@@ -55,7 +55,7 @@ func NewGameEngine(s *discordgo.Session, interactionsInitLoader InteractionsInit
 		GuildInitLoader:        guildInitLoader,
 		InteractionManager:     interactions.NewInteractionManager(s),
 		GuildManager:           guildManager,
-		PlayerCharacters:       make([]Character, 0),
+		CharacterManager:       NewCharacterManager(),
 	}
 
 	engine.init()
@@ -86,10 +86,7 @@ func (ge *GameEngine) Run() {
 
 	ge.GuildInitLoader.SetupBotChannels(ge, guildID)
 
-	//TODO struct property to manage various channels for the game
-
-	//TODO character creation workflow
-	ge.startCharacterCreation()
+	ge.populateGeneralChannel()
 
 	awaitTerminateSignal()
 	ge.Session.Close()
@@ -99,21 +96,105 @@ func (ge *GameEngine) StartEventListeners() {
 	ge.EventManager.Subscribe(events.Subscription{
 		EventType: events.EventCharacterCreationStarted,
 		Handler: func(data interface{}) {
-			fmt.Println("Character creation started for user: ", data)
+			if eventData, ok := data.(*events.CharacterCreationStartedData); ok {
+				fmt.Printf("Character creation started for user: %s at %v\n", eventData.UserID, eventData.Timestamp)
+				ge.CharacterManager.AddNewCharacter(eventData.UserID, &Character{})
+			} else {
+				fmt.Println("Unexpected data type for EventCharacterCreationStarted")
+			}
 		},
 	})
 
 	ge.EventManager.Subscribe(events.Subscription{
 		EventType: events.EventCharacterInfoSubmitted,
 		Handler: func(data interface{}) {
-			fmt.Println("Character info Event Received:", data)
+			if eventData, ok := data.(*events.CharacterInfoSubmittedData); ok {
+				fmt.Printf("Character info Event Received for user:%s Name=%s Age=%s\n", eventData.UserID, eventData.Name, eventData.Age)
+				age, err := strconv.Atoi(eventData.Age)
+
+				if err != nil {
+					fmt.Println("Conversion error:", err)
+				}
+
+				err = ge.CharacterManager.UpdateCharacterInfo(eventData.UserID, eventData.Name, age)
+				if err != nil {
+					fmt.Printf("Error updating character: %s", err)
+				}
+
+				ge.EventManager.Publish(events.Event{
+					EventType: events.EventCharacterUpdated,
+					Data: &events.CharacterUpdatedData{
+						UserID:    eventData.UserID,
+						Timestamp: time.Now(),
+					},
+				})
+			} else {
+				fmt.Println("Unexpected data type for EventCharacterInfoSubmitted")
+			}
 		},
 	})
 
 	ge.EventManager.Subscribe(events.Subscription{
 		EventType: events.EventCharacterClassSubmitted,
 		Handler: func(data interface{}) {
-			fmt.Println("Class Selected Event Received:", data)
+			if eventData, ok := data.(*events.CharacterClassSubmittedData); ok {
+				fmt.Printf("Character Class Selected Event Received: for user:%s Class=%s\n", eventData.UserID, eventData.ClassName)
+				err := ge.CharacterManager.UpdateCharacterClass(eventData.UserID, eventData.ClassName)
+				if err != nil {
+					fmt.Printf("Error updating character: %s", err)
+				}
+
+				ge.EventManager.Publish(events.Event{
+					EventType: events.EventCharacterUpdated,
+					Data: &events.CharacterUpdatedData{
+						UserID:    eventData.UserID,
+						Timestamp: time.Now(),
+					},
+				})
+			} else {
+				fmt.Println("Unexpected data type for EventCharacterInfoSubmitted")
+			}
+		},
+	})
+
+	ge.EventManager.Subscribe(events.Subscription{
+		EventType: events.EventCharacterUpdated,
+		Handler: func(data interface{}) {
+			if eventData, ok := data.(*events.CharacterUpdatedData); ok {
+				fmt.Printf("Character Updated Event Received: for user:%s at %v\n", eventData.UserID, eventData.Timestamp)
+
+				category, err := ge.GuildManager.FindCategoryByName("turnbot")
+				if err != nil {
+					fmt.Printf("Error finding category: %s", err)
+					return //TODO return error from this method?
+				}
+
+				user, err := ge.GuildManager.UserByID(eventData.UserID)
+				if err != nil {
+					fmt.Printf("Error finding user by ID: %s", err)
+					return
+				}
+
+				userCharacterSheetChannelName := fmt.Sprintf("%s-character-sheet", user.Username)
+
+				characterChannel, err := ge.GuildManager.TryCreateChannelUnderCategory(userCharacterSheetChannelName, category.ID)
+				if err != nil {
+					fmt.Printf("Error creating channel: %s", err)
+				}
+
+				character := ge.CharacterManager.PlayerCharacters[user.ID] //todo encapsulate in method
+				if character == nil {
+					fmt.Printf("No character found for userID: %s", user.ID)
+					return
+				}
+
+				//TODO delete other messages
+				//TODO make channel readonly
+
+				ge.InteractionManager.SendTextMessage(characterChannel.ID, character.ToMessageContent())
+			} else {
+				fmt.Println("Unexpected data type for EventCharacterInfoSubmitted")
+			}
 		},
 	})
 }
@@ -125,9 +206,13 @@ func awaitTerminateSignal() {
 	<-sc
 }
 
-func (ge *GameEngine) startCharacterCreation() {
-	//TODO channel management (different channels for game) for ex this should be in a #character-creation channel?
-	err := ge.InteractionManager.SendButtonMessage(channelID, identifiers.ButtonStartCharacterCreationCustomID, "Create a character!")
+func (ge *GameEngine) populateGeneralChannel() {
+	channel, err := ge.GuildManager.FindChannelInCategoryByName("turnbot", "general")
+	if err != nil {
+		fmt.Printf("Error finding channel: %s", err)
+	}
+
+	err = ge.InteractionManager.SendButtonMessage(channel.ID, identifiers.ButtonStartCharacterCreationCustomID, "Create a character!")
 	if err != nil {
 		fmt.Println("error sending message:", err)
 	}

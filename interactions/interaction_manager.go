@@ -64,6 +64,14 @@ func (im *InteractionManager) SendButtonMessage(channelID string, customID ident
 	return err
 }
 
+func (im *InteractionManager) SendTextMessage(channelID string, content string) error {
+	_, err := im.Session.ChannelMessageSend(channelID, content)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 func (im *InteractionManager) AddDropdownInteraction(dropdown *DropdownInteraction) {
 	im.dropdownManager.registerDropdownInteraction(dropdown)
 }

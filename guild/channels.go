@@ -79,31 +79,6 @@ func (cm *channelManager) channelByName(channelName string, categoryID string) *
 	return cm.Channels[channelKey{Name: channelName, ParentID: categoryID}]
 }
 
-func (cm *channelManager) channelsUnderCategory(categoryName string) []*discordgo.Channel {
-	var result []*discordgo.Channel
-	var categoryID string
-
-	for _, channel := range cm.Channels {
-		if channel.Name == categoryName && channel.Type == discordgo.ChannelTypeGuildCategory {
-			categoryID = channel.ID
-			break
-		}
-	}
-
-	if categoryID == "" {
-		fmt.Printf("Category '%s' not found\n", categoryName)
-		return result
-	}
-
-	for _, channel := range cm.Channels {
-		if channel.ParentID == categoryID {
-			result = append(result, channel)
-		}
-	}
-
-	return result
-}
-
 func (cm *channelManager) createCategory(categoryName string) (*discordgo.Channel, error) {
 	category, err := cm.Session.GuildChannelCreateComplex(cm.GuildID, discordgo.GuildChannelCreateData{
 		Name: categoryName,
@@ -125,6 +100,49 @@ func (cm *channelManager) createChannelUnderCategory(channelName string, categor
 	}
 
 	return channel, nil
+}
+
+func (cm *channelManager) findCategoryByName(categoryName string) (*discordgo.Channel, error) {
+	channels, err := cm.Session.GuildChannels(cm.GuildID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Look for the category by name
+	for _, channel := range channels {
+		if channel.Type == discordgo.ChannelTypeGuildCategory && channel.Name == categoryName {
+			return channel, nil
+		}
+	}
+
+	return nil, fmt.Errorf("category '%s' not found", categoryName)
+}
+
+func (cm *channelManager) findChannelInCategoryByName(categoryName string, channelName string) (*discordgo.Channel, error) {
+	channels, err := cm.Session.GuildChannels(cm.GuildID)
+	if err != nil {
+		return nil, err
+	}
+
+	var categoryID string
+	for _, channel := range channels {
+		if channel.Type == discordgo.ChannelTypeGuildCategory && channel.Name == categoryName {
+			categoryID = channel.ID
+			break
+		}
+	}
+
+	if categoryID == "" {
+		return nil, fmt.Errorf("category '%s' not found", categoryName)
+	}
+
+	for _, channel := range channels {
+		if channel.ParentID == categoryID && channel.Name == channelName {
+			return channel, nil
+		}
+	}
+
+	return nil, fmt.Errorf("channel '%s' not found in category '%s'", channelName, categoryName)
 }
 
 // TODO this currently gets ALL channels. Maybe need a init method that puts into separate slices based on type (channel, category etc)

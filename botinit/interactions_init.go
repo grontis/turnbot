@@ -2,6 +2,7 @@ package botinit
 
 import (
 	"fmt"
+	"time"
 	"turnbot/events"
 	"turnbot/game"
 	"turnbot/identifiers"
@@ -24,20 +25,35 @@ func (b *BotInteractionsInitLoader) LoadButtonInteractions(engine *game.GameEngi
 		Label:    "Start Character Creation",
 		Style:    discordgo.PrimaryButton,
 		Handler: func(s *discordgo.Session, i *discordgo.InteractionCreate) {
-			userID := getUserIDFromInteraction(i)
+			user := getUserFromInteraction(i)
+			if user == nil {
+				fmt.Printf("No user found for discord interaction")
+				return
+			}
 
 			engine.EventManager.Publish(events.Event{
 				EventType: events.EventCharacterCreationStarted,
-				Data:      userID,
+				Data: &events.CharacterCreationStartedData{
+					UserID:    user.ID,
+					Timestamp: time.Now(),
+				},
 			})
 
-			engine.InteractionManager.SendButtonMessage(i.ChannelID, identifiers.ButtonOpenCharacterInfoModalCustomID, "Enter character details")
-			engine.InteractionManager.SendDropdownMessage(i.ChannelID, identifiers.DropdownClassSelectCustomID, "Select your class")
-
-			err := s.ChannelMessageDelete(i.ChannelID, i.Message.ID)
+			category, err := engine.GuildManager.FindCategoryByName("turnbot")
 			if err != nil {
-				fmt.Println("Error deleting message:", err)
+				fmt.Printf("Error finding category: %s", err)
+				return //TODO return error from this method?
 			}
+
+			userCharacterCreateChannelName := fmt.Sprintf("%s-create-character", user.Username)
+			userChannel, err := engine.GuildManager.TryCreateChannelUnderCategory(userCharacterCreateChannelName, category.ID)
+			if err != nil {
+				fmt.Printf("Error creating channel: %s", err)
+				return //TODO return error from this method?
+			}
+
+			engine.InteractionManager.SendButtonMessage(userChannel.ID, identifiers.ButtonOpenCharacterInfoModalCustomID, "Enter character details")
+			engine.InteractionManager.SendDropdownMessage(userChannel.ID, identifiers.DropdownClassSelectCustomID, "Select your class")
 
 			s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 				Type: discordgo.InteractionResponseDeferredMessageUpdate,
@@ -116,22 +132,23 @@ func (b *BotInteractionsInitLoader) LoadDropdownInteractions(engine *game.GameEn
 			// Get the selected value from the select menu
 			selectedValue := i.MessageComponentData().Values[0]
 
-			s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
-				Type: discordgo.InteractionResponseChannelMessageWithSource,
-				Data: &discordgo.InteractionResponseData{
-					Content: fmt.Sprintf("You selected: %s", selectedValue),
+			user := getUserFromInteraction(i)
+			engine.EventManager.Publish(events.Event{
+				EventType: events.EventCharacterClassSubmitted,
+				Data: &events.CharacterClassSubmittedData{
+					UserID:    user.ID,
+					ClassName: selectedValue,
 				},
 			})
 
-			//TODO add "re-select" prompt?
+			err := s.ChannelMessageDelete(i.ChannelID, i.Message.ID)
+			if err != nil {
+				fmt.Println("Error deleting message:", err)
+			}
 
-			engine.EventManager.Publish(events.Event{
-				EventType: events.EventCharacterClassSubmitted,
-				Data:      selectedValue,
+			s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+				Type: discordgo.InteractionResponseDeferredMessageUpdate,
 			})
-
-			//TODO event out that a character class was submitted for a given user.
-			//TODO outside of this define event handler that will catch those kind of events
 		},
 	})
 }
@@ -195,29 +212,41 @@ func (b *BotInteractionsInitLoader) LoadModalInteractions(engine *game.GameEngin
 		Handler: func(s *discordgo.Session, i *discordgo.InteractionCreate) {
 			//TODO TextInput sanitation and validation. Extension method or middleware that can be used for all TextInput?
 			//Some kind of wrapper struct?
-			username := i.ModalSubmitData().Components[0].(*discordgo.ActionsRow).Components[0].(*discordgo.TextInput).Value
+			name := i.ModalSubmitData().Components[0].(*discordgo.ActionsRow).Components[0].(*discordgo.TextInput).Value
 			age := i.ModalSubmitData().Components[1].(*discordgo.ActionsRow).Components[0].(*discordgo.TextInput).Value
-			s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
-				Type: discordgo.InteractionResponseChannelMessageWithSource,
-				Data: &discordgo.InteractionResponseData{
-					Content: fmt.Sprintf("You entered: Username: %s, Age: %s", username, age),
+
+			user := getUserFromInteraction(i)
+			engine.EventManager.Publish(events.Event{
+				EventType: events.EventCharacterInfoSubmitted,
+				Data: &events.CharacterInfoSubmittedData{
+					UserID: user.ID,
+					Name:   name,
+					Age:    age,
 				},
+			})
+
+			err := s.ChannelMessageDelete(i.ChannelID, i.Message.ID)
+			if err != nil {
+				fmt.Println("Error deleting message:", err)
+			}
+
+			s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+				Type: discordgo.InteractionResponseDeferredMessageUpdate,
 			})
 		},
 	})
 }
 
-func getUserIDFromInteraction(i *discordgo.InteractionCreate) string {
-	var userID string
+func getUserFromInteraction(i *discordgo.InteractionCreate) *discordgo.User {
 	//i.User.ID only used for DMs
 	if i.User != nil {
-		userID = i.User.ID
+		return i.User
 	}
 
 	//i.Member.User.ID only used for within guilds
 	if i.Member != nil {
-		userID = i.Member.User.ID
+		return i.Member.User
 	}
 
-	return userID
+	return nil
 }

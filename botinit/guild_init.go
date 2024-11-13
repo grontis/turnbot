@@ -15,7 +15,7 @@ func (b *BotGuildInitLoader) SetupBotChannels(engine *game.GameEngine, guildID s
 		log.Printf("error creating category %s: %s", turnbotCategoryName, err)
 	}
 
-	_, err = engine.GuildManager.TryCreateChannelUnderCategory("bot-test", turnbotCategory.ID)
+	_, err = engine.GuildManager.TryCreateChannelUnderCategory("general", turnbotCategory.ID)
 	if err != nil {
 		fmt.Printf("error creating channel: %s", err)
 		return err
