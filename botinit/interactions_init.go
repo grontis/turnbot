@@ -54,10 +54,9 @@ func (b *BotInteractionsInitLoader) LoadButtonInteractions(engine *game.GameEngi
 
 			engine.InteractionManager.SendButtonMessage(userChannel.ID, identifiers.ButtonOpenCharacterInfoModalCustomID, "Enter character details")
 			engine.InteractionManager.SendDropdownMessage(userChannel.ID, identifiers.DropdownClassSelectCustomID, "Select your class")
+			engine.InteractionManager.SendDropdownMessage(userChannel.ID, identifiers.DropdownRaceSelectCustomID, "Select your race")
 
-			s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
-				Type: discordgo.InteractionResponseDeferredMessageUpdate,
-			})
+			AcknowledgeInteractionWithNoResponse(s, i)
 		},
 	})
 
@@ -146,9 +145,50 @@ func (b *BotInteractionsInitLoader) LoadDropdownInteractions(engine *game.GameEn
 				fmt.Println("Error deleting message:", err)
 			}
 
-			s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
-				Type: discordgo.InteractionResponseDeferredMessageUpdate,
+			AcknowledgeInteractionWithNoResponse(s, i)
+		},
+	})
+
+	engine.InteractionManager.AddDropdownInteraction(&interactions.DropdownInteraction{
+		CustomID:    identifiers.DropdownRaceSelectCustomID,
+		Placeholder: "Select your character's race",
+
+		Options: []discordgo.SelectMenuOption{
+			{
+				Label:       "Human",
+				Value:       "Human",
+				Description: "",
+			},
+			{
+				Label:       "Elf",
+				Value:       "Elf",
+				Description: "",
+			},
+			{
+				Label:       "Dwarf",
+				Value:       "Dwarf",
+				Description: "",
+			},
+		},
+		Handler: func(s *discordgo.Session, i *discordgo.InteractionCreate) {
+			// Get the selected value from the select menu
+			selectedValue := i.MessageComponentData().Values[0]
+
+			user := getUserFromInteraction(i)
+			engine.EventManager.Publish(events.Event{
+				EventType: events.EventCharacterRaceSubmitted,
+				Data: &events.CharacterRaceSubmittedData{
+					UserID:   user.ID,
+					RaceName: selectedValue,
+				},
 			})
+
+			err := s.ChannelMessageDelete(i.ChannelID, i.Message.ID)
+			if err != nil {
+				fmt.Println("Error deleting message:", err)
+			}
+
+			AcknowledgeInteractionWithNoResponse(s, i)
 		},
 	})
 }
@@ -230,10 +270,14 @@ func (b *BotInteractionsInitLoader) LoadModalInteractions(engine *game.GameEngin
 				fmt.Println("Error deleting message:", err)
 			}
 
-			s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
-				Type: discordgo.InteractionResponseDeferredMessageUpdate,
-			})
+			AcknowledgeInteractionWithNoResponse(s, i)
 		},
+	})
+}
+
+func AcknowledgeInteractionWithNoResponse(s *discordgo.Session, i *discordgo.InteractionCreate) {
+	s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+		Type: discordgo.InteractionResponseDeferredMessageUpdate,
 	})
 }
 

@@ -34,9 +34,12 @@ func (c *Character) ToMessageContent() string {
 	}
 
 	if c.Class.Name != "" {
-		message += fmt.Sprintf("## %s\n", c.Class.Name)
+		message += fmt.Sprintf("### %s\n", c.Class.Name)
 	}
 
+	if c.Race.Name != "" {
+		message += fmt.Sprintf("### %s\n", c.Race.Name)
+	}
 	//TODO other class properties
 
 	return message
@@ -74,5 +77,15 @@ func (cm *CharacterManager) UpdateCharacterClass(userID string, className string
 	}
 
 	character.Class = *NewClass(className)
+	return nil
+}
+
+func (cm *CharacterManager) UpdateCharacterRace(userID string, raceName string) error {
+	character := cm.PlayerCharacters[userID]
+	if character == nil {
+		return fmt.Errorf("no character found to update for userID: %s", userID)
+	}
+
+	character.Race = Race{Name: raceName}
 	return nil
 }

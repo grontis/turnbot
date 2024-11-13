@@ -92,6 +92,7 @@ func (ge *GameEngine) Run() {
 	ge.Session.Close()
 }
 
+// TODO move actual logic into botinit package like other definitions
 func (ge *GameEngine) StartEventListeners() {
 	ge.EventManager.Subscribe(events.Subscription{
 		EventType: events.EventCharacterCreationStarted,
@@ -153,6 +154,29 @@ func (ge *GameEngine) StartEventListeners() {
 				})
 			} else {
 				fmt.Println("Unexpected data type for EventCharacterInfoSubmitted")
+			}
+		},
+	})
+
+	ge.EventManager.Subscribe(events.Subscription{
+		EventType: events.EventCharacterRaceSubmitted,
+		Handler: func(data interface{}) {
+			if eventData, ok := data.(*events.CharacterRaceSubmittedData); ok {
+				fmt.Printf("Character Race Selected Event Received: for user:%s Class=%s\n", eventData.UserID, eventData.RaceName)
+				err := ge.CharacterManager.UpdateCharacterRace(eventData.UserID, eventData.RaceName)
+				if err != nil {
+					fmt.Printf("Error updating character: %s", err)
+				}
+
+				ge.EventManager.Publish(events.Event{
+					EventType: events.EventCharacterUpdated,
+					Data: &events.CharacterUpdatedData{
+						UserID:    eventData.UserID,
+						Timestamp: time.Now(),
+					},
+				})
+			} else {
+				fmt.Println("Unexpected data type for EventCharacterRaceSubmitted")
 			}
 		},
 	})

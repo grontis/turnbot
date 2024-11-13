@@ -81,7 +81,7 @@ func (im *InteractionManager) HandleDropdownInteraction(i *discordgo.Interaction
 }
 
 func (im *InteractionManager) SendDropdownMessage(channelID string, customID identifiers.DropdownCustomID, content string) error {
-	dropdown := im.dropdownManager.dropdownInteraction(identifiers.DropdownClassSelectCustomID)
+	dropdown := im.dropdownManager.dropdownInteraction(customID)
 	if dropdown == nil {
 		return fmt.Errorf("no dropdown found with CustomID: %s", customID)
 	}

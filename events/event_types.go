@@ -8,6 +8,7 @@ const (
 	EventCharacterCreationStarted EventType = "EventCharacterCreationStarted"
 	EventCharacterInfoSubmitted   EventType = "EventCharacterInfoSubmitted"
 	EventCharacterClassSubmitted  EventType = "EventCharacterClassSubmitted"
+	EventCharacterRaceSubmitted   EventType = "EventCharacterRaceSubmitted"
 	EventCharacterUpdated         EventType = "EventCharacterUpdated"
 )
 
@@ -26,6 +27,12 @@ type CharacterClassSubmittedData struct {
 	UserID    string
 	ClassName string
 	Level     int
+}
+
+type CharacterRaceSubmittedData struct {
+	UserID   string
+	RaceName string
+	Level    int
 }
 
 type CharacterUpdatedData struct {

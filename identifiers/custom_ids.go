@@ -18,6 +18,7 @@ type DropdownCustomID string
 
 const (
 	DropdownClassSelectCustomID DropdownCustomID = "dropdown_class_select"
+	DropdownRaceSelectCustomID  DropdownCustomID = "dropdown_race_select"
 )
 
 type ModalCustomID string
