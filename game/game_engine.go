@@ -88,8 +88,161 @@ func (ge *GameEngine) Run() {
 
 	ge.populateGeneralChannel()
 
+	ge.debugStatAssignment()
+
 	awaitTerminateSignal()
 	ge.Session.Close()
+}
+
+func (ge *GameEngine) debugStatAssignment() {
+	ge.Session.AddHandler(func(s *discordgo.Session, i *discordgo.InteractionCreate) {
+		if i.Type == discordgo.InteractionMessageComponent {
+			handleButtonPress(s, i)
+		}
+	})
+
+	startCharacterCreation(ge.Session, "TODO")
+}
+
+var (
+	startingPoints  = 15
+	stats           = map[string]int{"Strength": 0, "Dexterity": 0, "Intelligence": 0}
+	remainingPoints = startingPoints
+)
+
+func startCharacterCreation(s *discordgo.Session, channelID string) {
+	// Initial embed message
+	embed := &discordgo.MessageEmbed{
+		Title:       "Character Creation: Stat Allocation",
+		Description: fmt.Sprintf("You have **%d points** to allocate. Use the buttons below to adjust your stats.", remainingPoints),
+		Fields: []*discordgo.MessageEmbedField{
+			{Name: "Strength", Value: fmt.Sprintf("%d", stats["Strength"]), Inline: true},
+			{Name: "Dexterity", Value: fmt.Sprintf("%d", stats["Dexterity"]), Inline: true},
+			{Name: "Intelligence", Value: fmt.Sprintf("%d", stats["Intelligence"]), Inline: true},
+		},
+	}
+
+	// Message action rows with buttons
+	actionRows := []discordgo.ActionsRow{
+		// Row for Strength adjustment
+		createStatAdjustmentRow("Strength"),
+		// Row for Dexterity adjustment
+		createStatAdjustmentRow("Dexterity"),
+		// Row for Intelligence adjustment
+		createStatAdjustmentRow("Intelligence"),
+		// Confirm button
+		{
+			Components: []discordgo.MessageComponent{
+				discordgo.Button{
+					Label:    "Confirm",
+					Style:    discordgo.PrimaryButton,
+					CustomID: "confirm",
+					Disabled: remainingPoints != 0,
+				},
+			},
+		},
+	}
+
+	s.ChannelMessageSendComplex(channelID, &discordgo.MessageSend{
+		Embed:      embed,
+		Components: []discordgo.MessageComponent{actionRows[0], actionRows[1], actionRows[2], actionRows[3]},
+	})
+}
+
+func createStatAdjustmentRow(stat string) discordgo.ActionsRow {
+	return discordgo.ActionsRow{
+		Components: []discordgo.MessageComponent{
+			discordgo.Button{
+				Label:    fmt.Sprintf("+ %s", stat),
+				Style:    discordgo.SuccessButton,
+				CustomID: fmt.Sprintf("add_%s", stat),
+				Disabled: remainingPoints <= 0,
+			},
+			discordgo.Button{
+				Label:    fmt.Sprintf("- %s", stat),
+				Style:    discordgo.DangerButton,
+				CustomID: fmt.Sprintf("subtract_%s", stat),
+				Disabled: stats[stat] <= 0,
+			},
+		},
+	}
+}
+
+func handleButtonPress(s *discordgo.Session, i *discordgo.InteractionCreate) {
+	stat := ""
+	if len(i.MessageComponentData().CustomID) > 4 {
+		stat = i.MessageComponentData().CustomID[4:] // Extract stat name from custom ID
+	}
+
+	switch i.MessageComponentData().CustomID[:3] {
+	case "add":
+		if remainingPoints > 0 {
+			stats[stat]++
+			remainingPoints--
+		}
+	case "sub":
+		if stats[stat] > 0 {
+			stats[stat]--
+			remainingPoints++
+		}
+	case "con":
+		// Confirm button logic
+		confirmStats(s, i)
+		return
+	}
+
+	// Update the embed message with new stats
+	updateEmbed(s, i)
+}
+
+func updateEmbed(s *discordgo.Session, i *discordgo.InteractionCreate) {
+	// Update the embed with the latest stats and remaining points
+	embed := &discordgo.MessageEmbed{
+		Title:       "Character Creation: Stat Allocation",
+		Description: fmt.Sprintf("You have **%d points** to allocate. Use the buttons below to adjust your stats.", remainingPoints),
+		Fields: []*discordgo.MessageEmbedField{
+			{Name: "Strength", Value: fmt.Sprintf("%d", stats["Strength"]), Inline: true},
+			{Name: "Dexterity", Value: fmt.Sprintf("%d", stats["Dexterity"]), Inline: true},
+			{Name: "Intelligence", Value: fmt.Sprintf("%d", stats["Intelligence"]), Inline: true},
+		},
+	}
+
+	// Update the action rows to enable/disable buttons based on remaining points
+	actionRows := []discordgo.ActionsRow{
+		createStatAdjustmentRow("Strength"),
+		createStatAdjustmentRow("Dexterity"),
+		createStatAdjustmentRow("Intelligence"),
+		{
+			Components: []discordgo.MessageComponent{
+				discordgo.Button{
+					Label:    "Confirm",
+					Style:    discordgo.PrimaryButton,
+					CustomID: "confirm",
+					Disabled: remainingPoints != 0,
+				},
+			},
+		},
+	}
+
+	s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+		Type: discordgo.InteractionResponseUpdateMessage,
+		Data: &discordgo.InteractionResponseData{
+			Embeds:     []*discordgo.MessageEmbed{embed},
+			Components: []discordgo.MessageComponent{actionRows[0], actionRows[1], actionRows[2], actionRows[3]},
+		},
+	})
+}
+
+func confirmStats(s *discordgo.Session, i *discordgo.InteractionCreate) {
+	// Final confirmation message
+	response := fmt.Sprintf("Character stats confirmed!\nStrength: %d\nDexterity: %d\nIntelligence: %d",
+		stats["Strength"], stats["Dexterity"], stats["Intelligence"])
+	s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+		Type: discordgo.InteractionResponseChannelMessageWithSource,
+		Data: &discordgo.InteractionResponseData{
+			Content: response,
+		},
+	})
 }
 
 // TODO move actual logic into botinit package like other definitions
